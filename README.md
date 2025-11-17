@@ -1,7 +1,10 @@
 # DefiPrice Markets
 
+> 🚀 Production-grade real-time cryptocurrency price streaming system
+
 A complete system that streams live crypto prices from DexScreener using Server-Sent Events (SSE), publishes them to Somnia Data Streams, and displays real-time reactive charts in a beautiful Next.js 14 trading dashboard.
 
+![Trading Dashboard](https://via.placeholder.com/800x400?text=DefiPrice+Markets+Dashboard)
 
 ## ✨ Features
 
@@ -28,11 +31,17 @@ DexScreener SSE → Price Bot → Somnia Streams → Next.js Dashboard → Users
 
 [📖 Read Full Architecture Documentation](./ARCHITECTURE.md)
 
-## ⚠️ Important Note
+## 🔗 Somnia Data Streams Integration
 
-The `@somnia-chain/streams` package is currently a placeholder. The system is fully built but uses **mock data** for development. See [SOMNIA_SDK_INTEGRATION.md](./SOMNIA_SDK_INTEGRATION.md) for details on integrating the real Somnia SDK when available.
+This project is **fully integrated with Somnia Data Streams SDK** (`@somnia-chain/streams`). The system:
 
-**The system works perfectly for testing and UI development!** It generates realistic price updates and demonstrates all features.
+- ✅ Uses the official Somnia SDK for reading and writing data
+- ✅ Publishes real-time price updates to Somnia Data Streams on-chain
+- ✅ Reads data from Somnia using `getByKey()` with schema decoding
+- ✅ Computes schema IDs using `computeSchemaId()`
+- ⚠️ Currently uses mock data in the dashboard as a fallback while DexScreener SSE connections are being established (403 errors require API authentication)
+
+**The bot writes to Somnia Data Streams when price data is available.** The dashboard polls Somnia every 5 seconds for real data and falls back to mock data for demonstration purposes.
 
 ## 🚀 Quick Start
 
@@ -41,7 +50,8 @@ The `@somnia-chain/streams` package is currently a placeholder. The system is fu
 - Node.js 20+
 - npm or yarn
 - DexScreener pair addresses
-- (Optional) Somnia wallet with tokens for production
+- Somnia wallet with STT tokens (for publishing to Data Streams)
+- (Optional) DexScreener API key for SSE authentication
 
 ### 1. Clone and Setup
 
@@ -67,15 +77,15 @@ SOMNIA_PRIVATE_KEY=0xYourPrivateKey
 PAIRS=solana:4RsXTiPDP3q...:SOL/USDC,ethereum:0xabc...:ETH/USDC
 ```
 
-### 3. Register Schema
+### 3. Compute Schema ID
 
 ```bash
 cd bot
 npm run build
-node dist/scripts/register-schema.js
+npm run register-schema
 ```
 
-Update `.env` with the returned `SOMNIA_SCHEMA_ID`.
+The script will compute the schema ID from your schema definition. Update `.env` with the returned `SOMNIA_SCHEMA_ID` (should be in hex format like `0x000...001`).
 
 ### 4. Start Services
 
@@ -220,7 +230,7 @@ docker-compose build && docker-compose up -d
 
 - **[ARCHITECTURE.md](./ARCHITECTURE.md)** - System architecture and design
 - **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Detailed deployment guide
-- **[SOMNIA_GUIDE.md](./bot/SOMNIA_GUIDE.md)** - Somnia integration guide
+- **[SOMNIA_SDK_INTEGRATION.md](./SOMNIA_SDK_INTEGRATION.md)** - Somnia Data Streams integration details
 
 ## 🛠️ Development
 
@@ -258,6 +268,7 @@ npm run type-check  # Type checking
 
 ### Backend (Bot)
 - Node.js 20+ with TypeScript
+- **@somnia-chain/streams** (Somnia Data Streams SDK)
 - EventSource (SSE client)
 - Viem (Ethereum library)
 - Winston (Logging)
@@ -266,6 +277,7 @@ npm run type-check  # Type checking
 ### Frontend (Dashboard)
 - Next.js 14 (App Router)
 - React 18 with TypeScript
+- **@somnia-chain/streams** (Somnia Data Streams SDK)
 - Zustand (State management)
 - TailwindCSS (Styling)
 - Shadcn UI (Components)
@@ -344,6 +356,11 @@ MIT License - see [LICENSE](./LICENSE) file for details
 - [Shadcn UI](https://ui.shadcn.com) - UI components
 - [TradingView](https://www.tradingview.com) - Charting library
 
+## 📧 Support
+
+- 🐛 **Issues**: [GitHub Issues](https://github.com/your-repo/issues)
+- 💬 **Discussions**: [GitHub Discussions](https://github.com/your-repo/discussions)
+- 📖 **Docs**: [Full Documentation](./ARCHITECTURE.md)
 
 ## 🌟 Star History
 
@@ -351,5 +368,6 @@ If you find this project useful, please consider giving it a star! ⭐
 
 ---
 
+**Built with ❤️ by the DefiPrice team**
 
-*Real-time crypto prices, powered by  Somnia DataStreams, and Next.js 14*
+*Real-time crypto prices, powered by DexScreener, Somnia, and Next.js 14*
