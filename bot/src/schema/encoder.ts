@@ -1,4 +1,5 @@
-import { encodeAbiParameters, parseAbiParameters } from 'viem';
+import { keccak256, toHex } from 'viem';
+import { SchemaEncoder } from '@somnia-chain/streams';
 
 /**
  * Schema definition for price data
@@ -12,6 +13,10 @@ import { encodeAbiParameters, parseAbiParameters } from 'viem';
  * int32 priceChange1h,
  * int32 priceChange24h
  */
+export const PRICE_SCHEMA = 'uint64 timestamp, string pair, string chain, uint256 priceUsd, uint256 liquidity, uint256 volume24h, int32 priceChange1h, int32 priceChange24h';
+
+// Initialize schema encoder
+const schemaEncoder = new SchemaEncoder(PRICE_SCHEMA);
 export interface PriceData {
   timestamp: bigint;
   pair: string;
@@ -123,27 +128,27 @@ export function parseDexScreenerUpdate(data: DexScreenerUpdate): PriceData | nul
 }
 
 /**
- * Encode PriceData for Somnia Data Streams
+ * Encode PriceData for Somnia Data Streams using SDK SchemaEncoder
  */
 export function encodePriceData(data: PriceData): `0x${string}` {
-  return encodeAbiParameters(
-    parseAbiParameters('uint64, string, string, uint256, uint256, uint256, int32, int32'),
-    [
-      data.timestamp,
-      data.pair,
-      data.chain,
-      data.priceUsd,
-      data.liquidity,
-      data.volume24h,
-      data.priceChange1h,
-      data.priceChange24h,
-    ]
-  );
+  return schemaEncoder.encodeData([
+    { name: 'timestamp', value: data.timestamp.toString(), type: 'uint64' },
+    { name: 'pair', value: data.pair, type: 'string' },
+    { name: 'chain', value: data.chain, type: 'string' },
+    { name: 'priceUsd', value: data.priceUsd.toString(), type: 'uint256' },
+    { name: 'liquidity', value: data.liquidity.toString(), type: 'uint256' },
+    { name: 'volume24h', value: data.volume24h.toString(), type: 'uint256' },
+    { name: 'priceChange1h', value: data.priceChange1h.toString(), type: 'int32' },
+    { name: 'priceChange24h', value: data.priceChange24h.toString(), type: 'int32' },
+  ]);
 }
 
 /**
- * Generate unique key for a trading pair
+ * Generate unique key for a trading pair as bytes32
+ * Uses keccak256 hash to convert chain:address to proper bytes32 format
  */
-export function generatePairKey(chain: string, pairAddress: string): string {
-  return `${chain}:${pairAddress}`;
+export function generatePairKey(chain: string, pairAddress: string): `0x${string}` {
+  const keyString = `${chain}:${pairAddress}`;
+  // keccak256 already returns 0x-prefixed hex, toHex converts string to bytes
+  return keccak256(toHex(keyString));
 }

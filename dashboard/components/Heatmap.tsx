@@ -27,12 +27,12 @@ export function Heatmap() {
 
   if (pairs.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading market data...</p>
-        </div>
-      </div>
+      <Card className="p-8 text-center">
+        <h2 className="text-2xl font-bold mb-2">Market insights arrive soon</h2>
+        <p className="text-sm text-muted-foreground">
+          Once data starts streaming, top gainers, losers, and the overview heatmap will appear here automatically.
+        </p>
+      </Card>
     )
   }
 

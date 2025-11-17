@@ -66,6 +66,7 @@ export const config = {
   // Somnia configuration
   somnia: {
     rpcUrl: process.env.SOMNIA_RPC_URL!,
+    contractAddress: (process.env.SOMNIA_CONTRACT_ADDRESS || '0x6AB397FF662e42312c003175DCD76EfF69D048Fc') as `0x${string}`,
     privateKey: process.env.SOMNIA_PRIVATE_KEY! as `0x${string}`,
     schemaId: process.env.SOMNIA_SCHEMA_ID! as `0x${string}`,
     publisherAddress: process.env.PUBLISHER_ADDRESS! as `0x${string}`,

@@ -1,5 +1,5 @@
 import { logger } from './utils/logger';
-import { SSEHandler } from './sse/handler';
+import { DexScreenerAPI } from './api/dexscreener';
 import { SomniaStreamsWriter } from './streams/writer';
 import { PriceDeduplicator } from './utils/deduplicator';
 import { parseDexScreenerUpdate, generatePairKey } from './schema/encoder';
@@ -9,7 +9,7 @@ import config from './config';
  * Main application class
  */
 class PriceStreamingBot {
-  private sseHandler: SSEHandler;
+  private dexscreenerAPI: DexScreenerAPI;
   private streamsWriter: SomniaStreamsWriter;
   private deduplicator: PriceDeduplicator;
   private isRunning = false;
@@ -22,10 +22,8 @@ class PriceStreamingBot {
       batchIntervalMs: config.somnia.batchIntervalMs,
     });
 
-    this.sseHandler = new SSEHandler({
-      baseUrl: config.dexscreener.baseUrl,
-      reconnectIntervalMs: config.dexscreener.reconnectIntervalMs,
-      maxReconnectAttempts: config.dexscreener.maxReconnectAttempts,
+    this.dexscreenerAPI = new DexScreenerAPI({
+      pollIntervalMs: 10000, // Poll every 10 seconds
       onUpdate: this.handlePriceUpdate.bind(this),
       onError: this.handleError.bind(this),
     });
@@ -42,10 +40,11 @@ class PriceStreamingBot {
 
     logger.info('Starting Price Streaming Bot');
     logger.info(`Monitoring ${config.pairs.length} pairs`);
+    logger.info('Using DexScreener REST API (polling every 10 seconds)');
 
     // Start monitoring each configured pair
     for (const pair of config.pairs) {
-      this.sseHandler.startPair(pair);
+      this.dexscreenerAPI.startPair(pair);
     }
 
     this.isRunning = true;
@@ -87,11 +86,11 @@ class PriceStreamingBot {
   }
 
   /**
-   * Handle SSE errors
+   * Handle API errors
    */
   private handleError(chain: string, pairAddress: string, error: Error): void {
     const key = generatePairKey(chain, pairAddress);
-    logger.error(`SSE error for ${key}:`, error.message);
+    logger.error(`API error for ${key}:`, error.message);
   }
 
   /**
@@ -99,18 +98,11 @@ class PriceStreamingBot {
    */
   private startStatusReporting(): void {
     setInterval(() => {
-      const status = this.sseHandler.getStatus();
-      const connected = status.filter((s) => s.connected).length;
+      const status = this.dexscreenerAPI.getStatus();
+      const polling = status.filter((s) => s.polling).length;
       const pending = this.streamsWriter.getPendingCount();
 
-      logger.info(`Status: ${connected}/${status.length} pairs connected, ${pending} updates pending`);
-
-      // Log individual pair status
-      for (const pair of status) {
-        if (!pair.connected) {
-          logger.warn(`Pair ${pair.key} disconnected (${pair.reconnectAttempts} reconnect attempts)`);
-        }
-      }
+      logger.info(`Status: ${polling}/${status.length} pairs polling, ${pending} updates pending`);
     }, 60000); // Every 60 seconds
   }
 
@@ -151,8 +143,8 @@ class PriceStreamingBot {
 
     this.isRunning = false;
 
-    // Stop all SSE connections
-    this.sseHandler.stopAll();
+    // Stop all polling
+    this.dexscreenerAPI.stopAll();
 
     // Flush remaining updates
     await this.streamsWriter.shutdown();

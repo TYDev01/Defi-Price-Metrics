@@ -3,9 +3,28 @@ import { createWalletClient, createPublicClient, http, defineChain } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts';
 import dotenv from 'dotenv';
 import path from 'path';
+import { existsSync } from 'fs';
+import { fileURLToPath } from 'url';
 
-// Load environment variables
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+// ESM compatibility
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load environment variables - try multiple paths
+const envPaths = [
+  path.resolve(__dirname, '../../../.env'),
+  path.resolve(__dirname, '../../.env'),
+  path.resolve(process.cwd(), '.env'),
+  path.resolve(process.cwd(), '../.env'),
+];
+
+for (const envPath of envPaths) {
+  if (existsSync(envPath)) {
+    console.log(`Loading .env from: ${envPath}`);
+    dotenv.config({ path: envPath });
+    break;
+  }
+}
 
 const somniaChain = defineChain({
   id: 50311,
@@ -87,6 +106,32 @@ async function registerSchema() {
   
   console.log(`\nSchema ID: ${schemaId}`);
   console.log(`Schema String: ${PRICE_SCHEMA}\n`);
+
+  // Check if schema is already registered
+  console.log('Checking if schema is already registered...');
+  const isRegistered = await sdk.streams.isDataSchemaRegistered(schemaId);
+  
+  if (isRegistered) {
+    console.log('✓ Schema is already registered on-chain\n');
+  } else {
+    console.log('Schema not registered yet. Registering now...\n');
+    
+    // Register the schema on-chain
+    const txHash = await sdk.streams.registerDataSchemas([
+      {
+        schemaName: SCHEMA_DEFINITION.name,
+        schema: PRICE_SCHEMA,
+        parentSchemaId: '0x0000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`, // zeroBytes32 for root schema
+      }
+    ], false); // don't ignore already registered schemas
+    
+    if (txHash instanceof Error) {
+      throw txHash;
+    }
+    
+    console.log(`✓ Schema registered successfully!`);
+    console.log(`Transaction hash: ${txHash}\n`);
+  }
 
   console.log('📋 Update your .env file with:');
   console.log(`SOMNIA_SCHEMA_ID=${schemaId}`);

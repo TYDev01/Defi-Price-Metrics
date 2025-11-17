@@ -1,5 +1,4 @@
-import { SDK } from '@somnia-chain/streams';
-import { createWalletClient, createPublicClient, http } from 'viem';
+import { createWalletClient, http } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { logger } from '../utils/logger';
 import { encodePriceData, generatePairKey, PriceData } from '../schema/encoder';
@@ -27,7 +26,6 @@ export interface BatchWriterOptions {
 }
 
 export class SomniaStreamsWriter {
-  private sdk: SDK;
   private account: ReturnType<typeof privateKeyToAccount>;
   private pendingUpdates: Map<string, StreamUpdate> = new Map();
   private batchTimer: NodeJS.Timeout | null = null;
@@ -37,22 +35,6 @@ export class SomniaStreamsWriter {
   constructor(options: BatchWriterOptions) {
     this.options = options;
     this.account = privateKeyToAccount(config.somnia.privateKey);
-
-    const publicClient = createPublicClient({
-      chain: somniaChain,
-      transport: http(config.somnia.rpcUrl),
-    });
-
-    const walletClient = createWalletClient({
-      account: this.account,
-      chain: somniaChain,
-      transport: http(config.somnia.rpcUrl),
-    });
-
-    this.sdk = new SDK({
-      public: publicClient,
-      wallet: walletClient,
-    });
 
     logger.info(`Somnia Streams Writer initialized for account: ${this.account.address}`);
   }
@@ -64,7 +46,7 @@ export class SomniaStreamsWriter {
     const key = generatePairKey(chain, pairAddress);
 
     const update: StreamUpdate = {
-      id: `0x${key}` as `0x${string}`,
+      id: key, // key is already 0x-prefixed from keccak256
       schemaId: config.somnia.schemaId,
       data: encodePriceData(priceData),
     };
@@ -135,22 +117,65 @@ export class SomniaStreamsWriter {
   }
 
   /**
-   * Write updates to Somnia Streams using actual SDK
+   * Write updates to Somnia Streams using custom contract address
    */
   private async writeToStreams(updates: StreamUpdate[]): Promise<void> {
     logger.debug('Writing to Somnia Streams:', {
       count: updates.length,
       schemaId: config.somnia.schemaId.toString(),
       publisher: this.account.address,
+      contractAddress: config.somnia.contractAddress,
     });
 
     try {
-      const txHash = await this.sdk.streams.set(updates);
-      logger.info(`Somnia write transaction: ${txHash}`);
+      // Write directly to the custom contract address
+      await this.writeDirectToContract(updates);
+      logger.info(`Successfully wrote to Somnia contract ${config.somnia.contractAddress}`);
     } catch (error: any) {
-      logger.error('Somnia SDK write error:', error);
+      logger.error('Somnia write error:', error);
       throw error;
     }
+  }
+
+  /**
+   * Write directly to custom contract address
+   */
+  private async writeDirectToContract(updates: StreamUpdate[]): Promise<void> {
+    const walletClient = createWalletClient({
+      account: this.account,
+      chain: somniaChain,
+      transport: http(config.somnia.rpcUrl),
+    });
+
+    // ABI for the esstores function
+    const abi = [
+      {
+        inputs: [
+          {
+            components: [
+              { name: 'id', type: 'bytes32' },
+              { name: 'schemaId', type: 'bytes32' },
+              { name: 'data', type: 'bytes' },
+            ],
+            name: 'dataStreams',
+            type: 'tuple[]',
+          },
+        ],
+        name: 'esstores',
+        outputs: [],
+        stateMutability: 'nonpayable',
+        type: 'function',
+      },
+    ] as const;
+
+    const txHash = await walletClient.writeContract({
+      address: config.somnia.contractAddress,
+      abi,
+      functionName: 'esstores',
+      args: [updates as any],
+    });
+
+    logger.info(`Somnia write transaction: ${txHash}`);
   }
 
   /**

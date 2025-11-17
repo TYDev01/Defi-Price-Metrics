@@ -2,7 +2,7 @@
 
 > 🚀 Production-grade real-time cryptocurrency price streaming system
 
-A complete system that streams live crypto prices from DexScreener using Server-Sent Events (SSE), publishes them to Somnia Data Streams, and displays real-time reactive charts in a beautiful Next.js 14 trading dashboard.
+A complete system that streams live crypto prices from DexScreener, publishes them to Somnia Data Streams, and displays real-time reactive charts in a beautiful Next.js trading dashboard. When Somnia has not yet produced a value for a pair, the dashboard seeds itself with a fresh DexScreener snapshot so users always see real market data—not mock placeholders.
 
 ![Trading Dashboard](https://via.placeholder.com/800x400?text=DefiPrice+Markets+Dashboard)
 
@@ -16,32 +16,31 @@ A complete system that streams live crypto prices from DexScreener using Server-
 - 🔄 **Auto-Reconnect** - Resilient SSE connections with exponential backoff
 - 📦 **Batch Optimization** - Efficient gas usage through batch transactions
 - 🎯 **Smart Filtering** - Deduplicate and throttle redundant updates
-- 🌐 **Multi-Chain** - Support for Solana, Ethereum, Base, and more
+- 🌐 **Multi-Chain** - Support for Ethereum, Solana, Base, Arbitrum, Polygon, BSC, Avalanche, Optimism, Fantom, Blast, Linea, Scroll, and more via config
 - 🐳 **Docker Ready** - Complete containerization for easy deployment
 
 ## 🏗️ Architecture
 
 ```
-DexScreener SSE → Price Bot → Somnia Streams → Next.js Dashboard → Users
+DexScreener REST/SSE → Price Bot → Somnia Streams (on-chain) → Next.js Dashboard
 ```
 
-- **Price Bot**: Node.js/TypeScript backend with SSE client
-- **Somnia Streams**: Decentralized data layer for publishing/subscribing
-- **Dashboard**: Next.js 14 with App Router, Zustand, and real-time updates
+- **Price Bot**: Node.js/TypeScript backend that polls DexScreener, deduplicates updates, and batches Somnia writes
+- **Somnia Streams**: Decentralized data layer for publishing/subscribing with schema-enforced payloads
+- **Dashboard**: Next.js App Router UI with Zustand state, live Somnia polling, and DexScreener seeding
 
 [📖 Read Full Architecture Documentation](./ARCHITECTURE.md)
 
 ## 🔗 Somnia Data Streams Integration
 
-This project is **fully integrated with Somnia Data Streams SDK** (`@somnia-chain/streams`). The system:
+This project is **fully integrated with Somnia Data Streams SDK** (`@somnia-chain/streams`). The DApp:
 
 - ✅ Uses the official Somnia SDK for reading and writing data
 - ✅ Publishes real-time price updates to Somnia Data Streams on-chain
 - ✅ Reads data from Somnia using `getByKey()` with schema decoding
-- ✅ Computes schema IDs using `computeSchemaId()`
-- ⚠️ Currently uses mock data in the dashboard as a fallback while DexScreener SSE connections are being established (403 errors require API authentication)
+- ✅ Computes schema IDs / hashes for each `chain:address` pair
 
-**The bot writes to Somnia Data Streams when price data is available.** The dashboard polls Somnia every 5 seconds for real data and falls back to mock data for demonstration purposes.
+**The bot writes to Somnia Data Streams whenever DexScreener produces a new value.** The dashboard polls Somnia every 3 seconds and, until the first on-chain update arrives for a pair, seeds the card with a real-time DexScreener snapshot so the UI never shows stale placeholders.
 
 ## 🚀 Quick Start
 
@@ -67,6 +66,10 @@ chmod +x setup.sh
 ```bash
 cp .env.example .env
 nano .env
+
+cp dashboard/.env.example dashboard/.env.local
+nano .env
+nano dashboard/.env.local
 ```
 
 Update with your configuration:
@@ -74,7 +77,13 @@ Update with your configuration:
 ```env
 SOMNIA_RPC_URL=https://dream-rpc.somnia.network
 SOMNIA_PRIVATE_KEY=0xYourPrivateKey
-PAIRS=solana:4RsXTiPDP3q...:SOL/USDC,ethereum:0xabc...:ETH/USDC
+SOMNIA_SCHEMA_ID=0x...
+PAIRS=ethereum:0x8ad5...:WETH/USDC,solana:Czfq...:SOL/USDC,base:0x4c36...:WETH/USDbC
+
+NEXT_PUBLIC_SOMNIA_RPC_URL=https://dream-rpc.somnia.network
+NEXT_PUBLIC_SCHEMA_ID=0x...
+NEXT_PUBLIC_PUBLISHER_ADDRESS=0x...
+NEXT_PUBLIC_PAIR_KEYS=ethereum:0x8ad5...,solana:Czfq...,base:0x4c36...
 ```
 
 ### 3. Compute Schema ID
@@ -113,6 +122,15 @@ npm run build && npm start
 ```
 
 Visit `http://localhost:3000` to see your dashboard!
+
+## ⚙️ How It Works
+
+1. **DexScreener polling** – The bot hits DexScreener’s REST endpoints (or SSE) for every entry listed in `PAIRS`.
+2. **Normalization** – `schema/encoder.ts` converts raw values into the Somnia schema (timestamp, pair string, chain, price/liquidity/volume uint256, basis-point deltas).
+3. **Batch writes** – `streams/writer.ts` hashes each `chain:pairAddress`, deduplicates updates, and batches them into Somnia’s `esstores` contract using the configured schema ID.
+4. **Somnia storage** – Somnia stores the latest payload per hash. Any reader that knows the schema ID + key can fetch it.
+5. **Dashboard polling** – `useSomniaStreams` hashes the same keys found in `NEXT_PUBLIC_PAIR_KEYS`, polls Somnia every 3 seconds, and updates the Zustand store. Until a Somnia value exists, it calls DexScreener once to seed the UI with live data.
+6. **UI rendering** – Components such as `PairList`, `PairStats`, and `/pair/[id]` read from the store to animate prices, display compact liquidity/volume, and chart history.
 
 ## 📁 Project Structure
 
@@ -155,13 +173,14 @@ DefipriceMarkets/
 
 1. Find pair on [DexScreener](https://dexscreener.com)
 2. Get chain and address from URL
-3. Add to `.env`:
+3. Add to `.env` for the bot **and** append the same `chain:address` to `dashboard/.env.local` → `NEXT_PUBLIC_PAIR_KEYS`
 
 ```env
 PAIRS=...,base:0xNewPairAddress:WETH/USDC
+NEXT_PUBLIC_PAIR_KEYS=...,base:0xNewPairAddress
 ```
 
-4. Restart bot
+4. Restart bot and dashboard so the env vars reload
 
 ### Monitoring
 
@@ -226,11 +245,6 @@ docker-compose down
 docker-compose build && docker-compose up -d
 ```
 
-## 📚 Documentation
-
-- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - System architecture and design
-- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Detailed deployment guide
-- **[SOMNIA_SDK_INTEGRATION.md](./SOMNIA_SDK_INTEGRATION.md)** - Somnia Data Streams integration details
 
 ## 🛠️ Development
 
@@ -255,12 +269,6 @@ npm run type-check  # Type checking
 ```
 
 ## 🔒 Security
-
-- ✅ Private keys never exposed to frontend
-- ✅ Environment-based configuration
-- ✅ Input validation and sanitization
-- ✅ Error handling and recovery
-- ✅ Secure Docker containers
 
 **Never commit `.env` files!**
 
@@ -326,7 +334,7 @@ npm run dev
 1. Open browser DevTools console
 2. Check for errors
 3. Verify `NEXT_PUBLIC_*` variables
-4. Confirm bot is running
+4. Confirm bot is running and Somnia schema ID / publisher match the values in `.env`
 
 ### High Memory Usage
 
@@ -356,18 +364,12 @@ MIT License - see [LICENSE](./LICENSE) file for details
 - [Shadcn UI](https://ui.shadcn.com) - UI components
 - [TradingView](https://www.tradingview.com) - Charting library
 
-## 📧 Support
 
-- 🐛 **Issues**: [GitHub Issues](https://github.com/your-repo/issues)
-- 💬 **Discussions**: [GitHub Discussions](https://github.com/your-repo/discussions)
-- 📖 **Docs**: [Full Documentation](./ARCHITECTURE.md)
 
 ## 🌟 Star History
 
 If you find this project useful, please consider giving it a star! ⭐
 
 ---
-
-**Built with ❤️ by the DefiPrice team**
 
 *Real-time crypto prices, powered by DexScreener, Somnia, and Next.js 14*

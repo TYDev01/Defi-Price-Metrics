@@ -24,11 +24,11 @@ export function PairList() {
 
   if (pairs.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-          <p className="text-muted-foreground">Connecting to live markets...</p>
-        </div>
+      <div className="rounded-xl border border-dashed border-muted-foreground/30 p-10 text-center">
+        <p className="text-lg font-medium">Listening for live market data…</p>
+        <p className="text-sm text-muted-foreground mt-2">
+          Prices will appear as soon as the first update arrives from Somnia Streams.
+        </p>
       </div>
     )
   }
