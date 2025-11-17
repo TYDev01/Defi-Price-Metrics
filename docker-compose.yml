@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  bot:
+    build:
+      context: .
+      dockerfile: bot/Dockerfile
+    container_name: defiprice-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./bot/logs:/app/logs
+    networks:
+      - defiprice-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "process.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: dashboard/Dockerfile
+    container_name: defiprice-dashboard
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_SOMNIA_RPC_URL=${NEXT_PUBLIC_SOMNIA_RPC_URL}
+      - NEXT_PUBLIC_SCHEMA_ID=${NEXT_PUBLIC_SCHEMA_ID}
+      - NEXT_PUBLIC_PUBLISHER_ADDRESS=${NEXT_PUBLIC_PUBLISHER_ADDRESS}
+      - NEXT_PUBLIC_PAIR_KEYS=${NEXT_PUBLIC_PAIR_KEYS}
+    networks:
+      - defiprice-network
+    depends_on:
+      - bot
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  defiprice-network:
+    driver: bridge
+
+volumes:
+  bot-logs:
