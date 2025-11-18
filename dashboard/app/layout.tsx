@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import { Space_Grotesk, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
+import { WalletProvider } from '@/components/WalletProvider'
+import { PairRegistryInitializer } from '@/components/PairRegistryInitializer'
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ['latin'],
@@ -24,7 +26,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
-      <body className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} font-sans`}>{children}</body>
+      <body className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} font-sans`}>
+        <WalletProvider />
+        <PairRegistryInitializer />
+        {children}
+      </body>
     </html>
   )
 }

@@ -82,7 +82,19 @@ export function getChainInfo(chain: string): { name: string; icon: string } {
     base: { name: 'Base', icon: '🔵' },
     arbitrum: { name: 'Arbitrum', icon: '🔷' },
     polygon: { name: 'Polygon', icon: '💜' },
+    bsc: { name: 'BNB Chain', icon: '🟡' },
+    avalanche: { name: 'Avalanche', icon: '🏔️' },
+    optimism: { name: 'Optimism', icon: '🟥' },
+    fantom: { name: 'Fantom', icon: '👻' },
+    blast: { name: 'Blast', icon: '💥' },
+    linea: { name: 'Linea', icon: '〽️' },
+    scroll: { name: 'Scroll', icon: '📜' },
   }
 
   return chains[chain.toLowerCase()] || { name: chain, icon: '🔗' }
+}
+
+export function truncateAddress(address: string, chars = 4): string {
+  if (!address) return ''
+  return `${address.slice(0, 2 + chars)}...${address.slice(-chars)}`
 }

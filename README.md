@@ -18,6 +18,7 @@ A complete system that streams live crypto prices from DexScreener, publishes th
 - 🎯 **Smart Filtering** - Deduplicate and throttle redundant updates
 - 🌐 **Multi-Chain** - Support for Ethereum, Solana, Base, Arbitrum, Polygon, BSC, Avalanche, Optimism, Fantom, Blast, Linea, Scroll, and more via config
 - 📣 **Telegram Alerts** - Optional 5-minute digests that broadcast the latest prices to any Telegram channel
+- 🔐 **Wallet-Gated Admin Tools** - Publisher wallet curates global markets while any user can maintain a private watchlist
 - 🐳 **Docker Ready** - Complete containerization for easy deployment
 
 ## 🏗️ Architecture
@@ -203,6 +204,20 @@ docker-compose logs -f
 # Manual
 tail -f bot/logs/combined.log
 ```
+
+### Admin Console (Publisher Only)
+
+1. Visit `/admin` and click **Connect Wallet**.
+2. Connect with the wallet that matches `PUBLISHER_ADDRESS` in `.env`.
+3. Provide the chain + pair address (and optional label) to append it to the dashboard’s active registry.
+4. Remind yourself to update the bot `.env` so Somnia keeps streaming the new market; the UI persistence currently lives in the browser’s local storage.
+
+### My Watch (Per Wallet)
+
+1. Browse to `/watch` and connect any non-publisher wallet.
+2. Add chain + pair address entries to build a private list. Everything is stored locally per wallet, never on-chain.
+3. DexScreener pulls refresh roughly every 15 seconds so you always see live numbers.
+4. Removing a card only affects your personal dashboard.
 
 ### Telegram Notifications (Optional)
 

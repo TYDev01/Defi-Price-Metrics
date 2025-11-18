@@ -8,9 +8,13 @@ import { useSomniaStreams } from '@/hooks/useSomniaStreams'
 import { formatPrice, formatPercentage, getChangeColor, getChainInfo } from '@/lib/utils'
 import { Card } from '@/components/ui/card'
 import { TrendingUp, TrendingDown } from 'lucide-react'
+import { usePairRegistry, pairKey as buildPairKey } from '@/lib/pair-registry'
 
 export function PairList() {
-  useSomniaStreams()
+  const combinedPairs = usePairRegistry((state) => state.combinedPairs)
+  const pairKeys = useMemo(() => combinedPairs.map((pair) => buildPairKey(pair)), [combinedPairs])
+
+  useSomniaStreams(pairKeys)
   
   const pairs = usePriceStore((state) => Array.from(state.pairs.values()))
 

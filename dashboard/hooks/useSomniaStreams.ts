@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { usePriceStore, type PriceData } from '@/lib/store'
 import { SDK, SchemaEncoder } from '@somnia-chain/streams'
 import { createPublicClient, http, defineChain, keccak256, toHex } from 'viem'
@@ -8,7 +8,7 @@ import { createPublicClient, http, defineChain, keccak256, toHex } from 'viem'
 const SOMNIA_RPC_URL = process.env.NEXT_PUBLIC_SOMNIA_RPC_URL || ''
 const SCHEMA_ID = process.env.NEXT_PUBLIC_SCHEMA_ID || ''
 const PUBLISHER_ADDRESS = process.env.NEXT_PUBLIC_PUBLISHER_ADDRESS || ''
-const PAIR_KEYS = process.env.NEXT_PUBLIC_PAIR_KEYS?.split(',').map((key) => key.trim()).filter(Boolean) || []
+const DEFAULT_PAIR_KEYS = process.env.NEXT_PUBLIC_PAIR_KEYS?.split(',').map((key) => key.trim()).filter(Boolean) || []
 const NORMALIZED_SCHEMA_ID = normalizeSchemaId(SCHEMA_ID)
 
 const somniaChain = defineChain({
@@ -26,8 +26,13 @@ const priceSchema = 'uint64 timestamp, string pair, string chain, uint256 priceU
 /**
  * Hook to subscribe to Somnia Data Streams
  */
-export function useSomniaStreams() {
+export function useSomniaStreams(customPairKeys?: string[]) {
   const { updatePair, addHistoryPoint, setConnected, setError } = usePriceStore()
+
+  const sanitizedPairs = useMemo(() => {
+    const source = customPairKeys && customPairKeys.length ? customPairKeys : DEFAULT_PAIR_KEYS
+    return source.map((key) => key.trim()).filter(Boolean)
+  }, [customPairKeys?.join('|')])
 
   useEffect(() => {
     if (!SOMNIA_RPC_URL || !NORMALIZED_SCHEMA_ID || !PUBLISHER_ADDRESS) {
@@ -39,7 +44,7 @@ export function useSomniaStreams() {
       rpcUrl: SOMNIA_RPC_URL,
       schemaId: NORMALIZED_SCHEMA_ID,
       publisher: PUBLISHER_ADDRESS,
-      pairs: PAIR_KEYS,
+      pairs: sanitizedPairs,
     })
 
     // Initialize SDK with public client only (read-only for dashboard)
@@ -56,14 +61,14 @@ export function useSomniaStreams() {
     setConnected(true)
 
     // Seed UI with current DexScreener prices while waiting for Somnia data
-    seedFallbackPrices(PAIR_KEYS, updatePair).catch((error) => {
+    seedFallbackPrices(sanitizedPairs, updatePair).catch((error) => {
       console.warn('DexScreener fallback failed:', error)
     })
 
     // Poll for updates from Somnia Data Streams
     const pollInterval = setInterval(async () => {
       try {
-        for (const key of PAIR_KEYS) {
+        for (const key of sanitizedPairs) {
           const streamKey = generatePairKey(key)
           try {
             const data = await sdk.streams.getByKey(
@@ -106,7 +111,7 @@ export function useSomniaStreams() {
       setConnected(false)
       clearInterval(pollInterval)
     }
-  }, [updatePair, addHistoryPoint, setConnected, setError])
+  }, [sanitizedPairs, updatePair, addHistoryPoint, setConnected, setError])
 }
 
 function normalizeSchemaId(value: string): `0x${string}` | null {
