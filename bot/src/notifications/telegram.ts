@@ -22,13 +22,11 @@ interface PriceSnapshot {
  */
 export class TelegramNotifier {
   private timer?: NodeJS.Timeout;
-  private readonly pairOrder: string[];
   private readonly pairLabels: Map<string, string>;
   private readonly latest: Map<string, PriceSnapshot> = new Map();
   private isSending = false;
 
   constructor(private readonly options: TelegramNotifierOptions) {
-    this.pairOrder = options.pairs.map((pair) => this.getPairKey(pair.chain, pair.pairAddress));
     this.pairLabels = new Map(
       options.pairs.map((pair) => [this.getPairKey(pair.chain, pair.pairAddress), pair.symbol])
     );
@@ -90,22 +88,28 @@ export class TelegramNotifier {
     this.isSending = true;
 
     try {
-      const lines: string[] = [];
+      const snapshots = Array.from(this.latest.values());
+      const gainers = this.selectMovers(snapshots, 'up');
+      const losers = this.selectMovers(snapshots, 'down');
 
-      for (const key of this.pairOrder) {
-        const snapshot = this.latest.get(key);
-        if (!snapshot) {
-          continue;
-        }
-        lines.push(this.formatLine(snapshot));
-      }
-
-      if (lines.length === 0) {
+      if (gainers.length === 0 && losers.length === 0) {
         return;
       }
 
-      const header = `📊 Somnia Price Bot\n${new Date().toUTCString()}`;
-      const message = `${header}\n\n${lines.join('\n')}`;
+      const sections: string[] = [];
+      sections.push(`📊 Somnia Price Bot\n🕒 ${new Date().toUTCString()}`);
+
+      if (gainers.length) {
+        const lines = gainers.map((snapshot) => this.formatLine(snapshot, 'up'));
+        sections.push(`\n🚀 Top Gainers (24h)\n${lines.join('\n')}`);
+      }
+
+      if (losers.length) {
+        const lines = losers.map((snapshot) => this.formatLine(snapshot, 'down'));
+        sections.push(`\n📉 Top Losers (24h)\n${lines.join('\n')}`);
+      }
+
+      const message = sections.join('\n');
 
       await this.sendMessage(message);
       logger.info('Telegram price digest sent');
@@ -114,16 +118,18 @@ export class TelegramNotifier {
     }
   }
 
-  private formatLine(snapshot: PriceSnapshot): string {
+  private formatLine(snapshot: PriceSnapshot, direction: 'up' | 'down'): string {
     const price = this.formatPrice(snapshot.priceUsd);
-    const change = snapshot.change24h >= 0
-      ? `+${snapshot.change24h.toFixed(2)}%`
-      : `${snapshot.change24h.toFixed(2)}%`;
+    const changeValue = snapshot.change24h;
+    const change = changeValue >= 0
+      ? `+${changeValue.toFixed(2)}%`
+      : `${changeValue.toFixed(2)}%`;
 
     const ageMinutes = Math.max(0, Math.floor((Date.now() / 1000 - snapshot.timestamp) / 60));
     const freshness = ageMinutes > 0 ? `${ageMinutes}m ago` : 'just now';
+    const trendIcon = direction === 'up' ? '🟢' : '🔴';
 
-    return `${snapshot.symbol} (${snapshot.chain}): $${price} | 24h ${change} • ${freshness}`;
+    return `${trendIcon} ${snapshot.symbol} (${snapshot.chain}) — $${price} | 24h ${change} • ${freshness}`;
   }
 
   private formatPrice(value: number): string {
@@ -144,6 +150,30 @@ export class TelegramNotifier {
 
   private getPairKey(chain: string, pairAddress: string): string {
     return `${chain}:${pairAddress}`;
+  }
+
+  private selectMovers(snapshots: PriceSnapshot[], direction: 'up' | 'down'): PriceSnapshot[] {
+    if (snapshots.length === 0) {
+      return [];
+    }
+
+    const filtered = snapshots
+      .slice()
+      .sort((a, b) => direction === 'up' ? b.change24h - a.change24h : a.change24h - b.change24h);
+
+    if (direction === 'up') {
+      const positive = filtered.filter((snapshot) => snapshot.change24h > 0);
+      if (positive.length >= 3) {
+        return positive.slice(0, 3);
+      }
+      return filtered.slice(0, Math.min(3, filtered.length));
+    }
+
+    const negative = filtered.filter((snapshot) => snapshot.change24h < 0);
+    if (negative.length >= 3) {
+      return negative.slice(0, 3);
+    }
+    return filtered.slice(0, Math.min(3, filtered.length));
   }
 
   private async sendMessage(text: string): Promise<void> {
