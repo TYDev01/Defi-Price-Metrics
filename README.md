@@ -1,14 +1,18 @@
 # DefiPrice Markets
 
-> 🚀 Production-grade real-time cryptocurrency price streaming system
+> 🚀 Real-Time Decentralized Crypto Price Streaming
 
-A complete system that streams live crypto prices from DexScreener, publishes them to Somnia Data Streams, and displays real-time reactive charts in a beautiful Next.js trading dashboard. When Somnia has not yet produced a value for a pair, the dashboard seeds itself with a fresh DexScreener snapshot so users always see real market data—not mock placeholders.
+DeFi Price Metrics is a decentralized real-time price streaming platform that connects the speed of off-chain Web3 market data with the trustlessness of on-chain storage — delivering lightning-fast, reactive price charts for traders, builders, and DeFi applications.
 
-![Trading Dashboard](https://via.placeholder.com/800x400?text=DefiPrice+Markets+Dashboard)
+Built with a modern, high-performance architecture, the platform ingests live token prices from DexScreener, streams them through a resilient Node.js service via Server-Sent Events (SSE), publishes every update to Somnia Data Streams, and showcases the live market movement on a beautiful, interactive Next.js trading dashboard.
+
+This creates a fully decentralized, verifiable, and reactive system where users anywhere in the world can watch token activity with sub-second latency — without relying on centralized servers or custodial APIs
+
+![Trading Dashboard](dashboard.png)
 
 ## ✨ Features
 
-- 📊 **Real-Time Price Streaming** - Live updates from DexScreener across multiple chains
+- 📊 **Real-Time Price Streaming** - Live updates across multiple chains
 - 🔗 **Somnia Data Streams** - Decentralized data publication and subscription
 - 📈 **Interactive Charts** - TradingView-powered price charts with history
 - 🎨 **Beautiful UI** - Dark trading theme with Shadcn UI components
@@ -58,7 +62,7 @@ This project is **fully integrated with Somnia Data Streams SDK** (`@somnia-chai
 ### 1. Clone and Setup
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/TYDev01/Defi-Price-Metrics.git
 cd DefipriceMarkets
 chmod +x setup.sh
 ./setup.sh
@@ -407,7 +411,7 @@ max_memory_restart: '1G'
 
 ## 📝 License
 
-MIT License - see [LICENSE](./LICENSE) file for details
+MIT License 
 
 ## 🙏 Acknowledgments
 
