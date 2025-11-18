@@ -30,6 +30,8 @@ export default function AdminPage() {
   const removeAdminPair = usePairRegistry((state) => state.removeAdminPair)
   const adminPairs = usePairRegistry((state) => state.adminPairs)
   const basePairs = usePairRegistry((state) => state.basePairs)
+  const isRegistryLoading = usePairRegistry((state) => state.isLoading)
+  const registryError = usePairRegistry((state) => state.error)
 
   const [chain, setChain] = useState('ethereum')
   const [addressInput, setAddressInput] = useState('')
@@ -39,7 +41,7 @@ export default function AdminPage() {
 
   const knownPairs = useMemo(() => basePairs.map((pair) => pairKey(pair)), [basePairs])
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setError(null)
     setSuccess(null)
@@ -61,10 +63,19 @@ export default function AdminPage() {
       return
     }
 
-    addAdminPair(formatted)
-    setSuccess('Pair added to dashboard list')
-    setAddressInput('')
-    setLabel('')
+    if (!address) {
+      setError('Connect with the publisher wallet to add pairs')
+      return
+    }
+
+    try {
+      await addAdminPair(formatted, address)
+      setSuccess('Pair added to dashboard list')
+      setAddressInput('')
+      setLabel('')
+    } catch (addError) {
+      setError((addError as Error).message)
+    }
   }
 
   if (!address) {
@@ -173,7 +184,18 @@ export default function AdminPage() {
                       <p className="text-xs text-muted-foreground uppercase">{pair.chain}</p>
                     </div>
                     <button
-                      onClick={() => removeAdminPair(key)}
+                      onClick={async () => {
+                        if (!address) {
+                          setError('Connect with the publisher wallet to remove pairs')
+                          return
+                        }
+                        try {
+                          await removeAdminPair(key, address)
+                          setSuccess('Pair removed')
+                        } catch (removeError) {
+                          setError((removeError as Error).message)
+                        }
+                      }}
                       className="text-xs text-red-500 hover:underline"
                     >
                       Remove
@@ -182,6 +204,12 @@ export default function AdminPage() {
                 )
               })}
             </div>
+          )}
+          {registryError && (
+            <p className="text-sm text-red-500 mt-4">{registryError}</p>
+          )}
+          {isRegistryLoading && (
+            <p className="text-xs text-muted-foreground mt-2">Loading admin pairs...</p>
           )}
         </section>
       </div>

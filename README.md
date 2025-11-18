@@ -19,6 +19,7 @@ A complete system that streams live crypto prices from DexScreener, publishes th
 - 🌐 **Multi-Chain** - Support for Ethereum, Solana, Base, Arbitrum, Polygon, BSC, Avalanche, Optimism, Fantom, Blast, Linea, Scroll, and more via config
 - 📣 **Telegram Alerts** - Optional 5-minute digests that broadcast the latest prices to any Telegram channel
 - 🔐 **Wallet-Gated Admin Tools** - Publisher wallet curates global markets while any user can maintain a private watchlist
+- ☁️ **Firestore Persistence** - Admin-added pairs sync through Firebase so every dashboard shares the same curated list
 - 🐳 **Docker Ready** - Complete containerization for easy deployment
 
 ## 🏗️ Architecture
@@ -92,6 +93,11 @@ TELEGRAM_BOT_TOKEN=123456:abcdef
 TELEGRAM_CHAT_ID=-1001234567890
 TELEGRAM_NOTIFIER_ENABLED=true
 TELEGRAM_INTERVAL_MS=300000
+
+# Firebase (admin pairs persistence)
+FIREBASE_PROJECT_ID=your-project
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk@your-project.iam.gserviceaccount.com
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
 ```
 
 ### 3. Compute Schema ID
@@ -209,8 +215,8 @@ tail -f bot/logs/combined.log
 
 1. Visit `/admin` and click **Connect Wallet**.
 2. Connect with the wallet that matches `PUBLISHER_ADDRESS` in `.env`.
-3. Provide the chain + pair address (and optional label) to append it to the dashboard’s active registry.
-4. Remind yourself to update the bot `.env` so Somnia keeps streaming the new market; the UI persistence currently lives in the browser’s local storage.
+3. Provide the chain + pair address (and optional label) to append it to the dashboard’s Firestore-backed registry (configure service-account env vars first).
+4. Remind yourself to update the bot `.env` so Somnia keeps streaming the new market; Firestore keeps the dashboard lists in sync, but the bot still needs matching `PAIRS`.
 
 ### My Watch (Per Wallet)
 
@@ -267,6 +273,14 @@ MIN_UPDATE_INTERVAL_MS=2000   # Min 2s interval
 | `TELEGRAM_CHAT_ID` | Channel/group/user chat ID (use negative ID for channels) | _required to enable_ |
 | `TELEGRAM_NOTIFIER_ENABLED` | Set to `false` to disable without removing secrets | `true` |
 | `TELEGRAM_INTERVAL_MS` | Interval between digests in milliseconds | `300000` (5 min) |
+
+### Firebase Admin Settings (Dashboard Only)
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `FIREBASE_PROJECT_ID` | Firebase project id backing Firestore | _required for admin pairs_ |
+| `FIREBASE_CLIENT_EMAIL` | Service-account client email with Firestore access | _required_ |
+| `FIREBASE_PRIVATE_KEY` | Multiline private key (wrap in quotes, keep `\n`) | _required_ |
 
 ## 🐳 Docker Deployment
 
