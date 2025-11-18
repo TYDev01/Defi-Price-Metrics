@@ -17,6 +17,7 @@ A complete system that streams live crypto prices from DexScreener, publishes th
 - 📦 **Batch Optimization** - Efficient gas usage through batch transactions
 - 🎯 **Smart Filtering** - Deduplicate and throttle redundant updates
 - 🌐 **Multi-Chain** - Support for Ethereum, Solana, Base, Arbitrum, Polygon, BSC, Avalanche, Optimism, Fantom, Blast, Linea, Scroll, and more via config
+- 📣 **Telegram Alerts** - Optional 5-minute digests that broadcast the latest prices to any Telegram channel
 - 🐳 **Docker Ready** - Complete containerization for easy deployment
 
 ## 🏗️ Architecture
@@ -84,6 +85,12 @@ NEXT_PUBLIC_SOMNIA_RPC_URL=https://dream-rpc.somnia.network
 NEXT_PUBLIC_SCHEMA_ID=0x...
 NEXT_PUBLIC_PUBLISHER_ADDRESS=0x...
 NEXT_PUBLIC_PAIR_KEYS=ethereum:0x8ad5...,solana:Czfq...,base:0x4c36...
+
+# Optional Telegram notifications
+TELEGRAM_BOT_TOKEN=123456:abcdef
+TELEGRAM_CHAT_ID=-1001234567890
+TELEGRAM_NOTIFIER_ENABLED=true
+TELEGRAM_INTERVAL_MS=300000
 ```
 
 ### 3. Compute Schema ID
@@ -131,6 +138,7 @@ Visit `http://localhost:3000` to see your dashboard!
 4. **Somnia storage** – Somnia stores the latest payload per hash. Any reader that knows the schema ID + key can fetch it.
 5. **Dashboard polling** – `useSomniaStreams` hashes the same keys found in `NEXT_PUBLIC_PAIR_KEYS`, polls Somnia every 3 seconds, and updates the Zustand store. Until a Somnia value exists, it calls DexScreener once to seed the UI with live data.
 6. **UI rendering** – Components such as `PairList`, `PairStats`, and `/pair/[id]` read from the store to animate prices, display compact liquidity/volume, and chart history.
+7. **Telegram digests (optional)** – When configured, the bot buffers the freshest values for each pair and ships a Telegram summary every five minutes.
 
 ## 📁 Project Structure
 
@@ -196,6 +204,13 @@ docker-compose logs -f
 tail -f bot/logs/combined.log
 ```
 
+### Telegram Notifications (Optional)
+
+1. Create a Telegram bot via [@BotFather](https://t.me/BotFather) and copy the API token.
+2. Add the bot to your target channel or group and promote it if the chat is private.
+3. Populate `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, and (optionally) `TELEGRAM_INTERVAL_MS` in `.env`.
+4. Restart the bot process. Every five minutes the latest prices will be posted as a digest; set `TELEGRAM_NOTIFIER_ENABLED=false` to pause alerts without removing secrets.
+
 ### Dashboard Pages
 
 - `/` - Markets overview with live prices
@@ -228,6 +243,15 @@ BATCH_INTERVAL_MS=10000    # Less frequent writes
 PRICE_CHANGE_THRESHOLD=0.005  # Only 0.5%+ changes
 MIN_UPDATE_INTERVAL_MS=2000   # Min 2s interval
 ```
+
+### Telegram Alert Settings
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `TELEGRAM_BOT_TOKEN` | BotFather token for your Telegram bot | _required to enable_ |
+| `TELEGRAM_CHAT_ID` | Channel/group/user chat ID (use negative ID for channels) | _required to enable_ |
+| `TELEGRAM_NOTIFIER_ENABLED` | Set to `false` to disable without removing secrets | `true` |
+| `TELEGRAM_INTERVAL_MS` | Interval between digests in milliseconds | `300000` (5 min) |
 
 ## 🐳 Docker Deployment
 

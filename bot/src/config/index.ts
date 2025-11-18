@@ -96,6 +96,20 @@ export const config = {
     // Price change threshold to trigger update (0.01 = 1%)
     priceChangeThreshold: parseFloat(process.env.PRICE_CHANGE_THRESHOLD || '0.001'),
   },
+
+  telegram: (() => {
+    const botToken = process.env.TELEGRAM_BOT_TOKEN || '';
+    const chatId = process.env.TELEGRAM_CHAT_ID || '';
+    const enabledFlag = process.env.TELEGRAM_NOTIFIER_ENABLED;
+    const enabled = Boolean(botToken && chatId && enabledFlag !== 'false');
+
+    return {
+      enabled,
+      botToken,
+      chatId,
+      intervalMs: parseInt(process.env.TELEGRAM_INTERVAL_MS || '300000', 10),
+    } as const;
+  })(),
 } as const;
 
 export default config;

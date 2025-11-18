@@ -4,6 +4,7 @@ import { SomniaStreamsWriter } from './streams/writer';
 import { PriceDeduplicator } from './utils/deduplicator';
 import { parseDexScreenerUpdate, generatePairKey } from './schema/encoder';
 import config from './config';
+import { TelegramNotifier } from './notifications/telegram';
 
 /**
  * Main application class
@@ -13,6 +14,7 @@ class PriceStreamingBot {
   private streamsWriter: SomniaStreamsWriter;
   private deduplicator: PriceDeduplicator;
   private isRunning = false;
+  private telegramNotifier?: TelegramNotifier;
 
   constructor() {
     this.deduplicator = new PriceDeduplicator();
@@ -27,6 +29,17 @@ class PriceStreamingBot {
       onUpdate: this.handlePriceUpdate.bind(this),
       onError: this.handleError.bind(this),
     });
+
+    if (config.telegram.enabled) {
+      this.telegramNotifier = new TelegramNotifier({
+        botToken: config.telegram.botToken,
+        chatId: config.telegram.chatId,
+        intervalMs: config.telegram.intervalMs,
+        pairs: config.pairs,
+      });
+    } else {
+      logger.info('Telegram notifier disabled (missing config)');
+    }
   }
 
   /**
@@ -54,6 +67,9 @@ class PriceStreamingBot {
 
     // Log status every 60 seconds
     this.startStatusReporting();
+
+    // Kick off Telegram digest loop if configured
+    this.telegramNotifier?.start();
   }
 
   /**
@@ -80,6 +96,9 @@ class PriceStreamingBot {
 
       // Queue update for batch processing
       await this.streamsWriter.queueUpdate(chain, pairAddress, priceData);
+
+      // Track price for Telegram notifications
+      this.telegramNotifier?.recordPrice(chain, pairAddress, priceData);
     } catch (error) {
       logger.error(`Error processing update for ${key}:`, error);
     }
@@ -148,6 +167,9 @@ class PriceStreamingBot {
 
     // Flush remaining updates
     await this.streamsWriter.shutdown();
+
+    // Stop Telegram notifier interval
+    this.telegramNotifier?.stop();
 
     logger.info('Bot stopped successfully');
   }
