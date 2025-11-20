@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
-import { createChart, ColorType, IChartApi, ISeriesApi } from 'lightweight-charts'
+import { useEffect, useMemo, useRef } from 'react'
+import { createChart, ColorType, IChartApi, ISeriesApi, type UTCTimestamp } from 'lightweight-charts'
 import { usePriceStore } from '@/lib/store'
 import { Card } from '@/components/ui/card'
 
@@ -68,11 +68,16 @@ export function TradingChart({ pairKey }: TradingChartProps) {
     }
   }, [])
 
+  const chartHistory = useMemo(
+    () => history.map(({ time, value }) => ({ time: Math.floor(time) as UTCTimestamp, value })),
+    [history]
+  )
+
   useEffect(() => {
-    if (seriesRef.current && history.length > 0) {
-      seriesRef.current.setData(history)
+    if (seriesRef.current && chartHistory.length > 0) {
+      seriesRef.current.setData(chartHistory)
     }
-  }, [history])
+  }, [chartHistory])
 
   return (
     <Card className="p-6">

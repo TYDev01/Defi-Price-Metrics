@@ -11,8 +11,10 @@ export function WalletProvider() {
       return
     }
 
-    const handleAccountsChanged = (accounts: string[]) => {
-      const account = accounts?.[0] ? accounts[0].toLowerCase() : null
+    const handleAccountsChanged = (accounts: unknown) => {
+      const list = Array.isArray(accounts) ? accounts : []
+      const first = typeof list[0] === 'string' ? list[0] : null
+      const account = first ? first.toLowerCase() : null
       setAddress(account)
     }
 

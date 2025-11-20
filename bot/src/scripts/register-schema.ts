@@ -4,16 +4,12 @@ import { privateKeyToAccount } from 'viem/accounts';
 import dotenv from 'dotenv';
 import path from 'path';
 import { existsSync } from 'fs';
-import { fileURLToPath } from 'url';
-
-// ESM compatibility
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const baseDir = __dirname;
 
 // Load environment variables - try multiple paths
 const envPaths = [
-  path.resolve(__dirname, '../../../.env'),
-  path.resolve(__dirname, '../../.env'),
+  path.resolve(baseDir, '../../../.env'),
+  path.resolve(baseDir, '../../.env'),
   path.resolve(process.cwd(), '.env'),
   path.resolve(process.cwd(), '../.env'),
 ];
@@ -102,7 +98,13 @@ async function registerSchema() {
 
   // Compute schema ID from schema string
   console.log('Computing schema ID...');
-  const schemaId = await sdk.streams.computeSchemaId(PRICE_SCHEMA);
+  const schemaIdResult = await sdk.streams.computeSchemaId(PRICE_SCHEMA);
+
+  if (schemaIdResult instanceof Error) {
+    throw schemaIdResult;
+  }
+
+  const schemaId = schemaIdResult;
   
   console.log(`\nSchema ID: ${schemaId}`);
   console.log(`Schema String: ${PRICE_SCHEMA}\n`);
