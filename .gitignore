@@ -55,3 +55,6 @@ QUICKSTART.md
 PROJECT_SUMMARY.md
 DEPLOYMENT.md
 PROJECT_README.md
+
+bot/check-somnia-write.js
+test-somnia-read.js

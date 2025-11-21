@@ -6,7 +6,7 @@ import config from '../config';
 import { defineChain } from 'viem';
 
 const somniaChain = defineChain({
-  id: 50311,
+  id: 50312,
   name: 'Somnia Testnet',
   nativeCurrency: { name: 'STT', symbol: 'STT', decimals: 18 },
   rpcUrls: {
@@ -168,14 +168,26 @@ export class SomniaStreamsWriter {
       },
     ] as const;
 
-    const txHash = await walletClient.writeContract({
-      address: config.somnia.contractAddress,
-      abi,
-      functionName: 'esstores',
-      args: [updates as any],
-    });
+    try {
+      const txHash = await walletClient.writeContract({
+        address: config.somnia.contractAddress,
+        abi,
+        functionName: 'esstores',
+        args: [updates as any],
+        gas: BigInt(10000000), // 10M gas limit
+      });
 
-    logger.info(`Somnia write transaction: ${txHash}`);
+      logger.info(`Somnia write transaction: ${txHash}`);
+    } catch (error: any) {
+      // Log detailed error for debugging
+      logger.error('Transaction failed:', {
+        error: error.message,
+        updates: updates.length,
+        contract: config.somnia.contractAddress,
+        account: this.account.address,
+      });
+      throw error;
+    }
   }
 
   /**

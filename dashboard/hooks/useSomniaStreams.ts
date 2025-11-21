@@ -2,17 +2,43 @@
 
 import { useEffect, useMemo } from 'react'
 import { usePriceStore, type PriceData } from '@/lib/store'
-import { SDK, SchemaEncoder } from '@somnia-chain/streams'
+import { SchemaEncoder } from '@somnia-chain/streams'
 import { createPublicClient, http, defineChain, keccak256, toHex } from 'viem'
 
 const SOMNIA_RPC_URL = process.env.NEXT_PUBLIC_SOMNIA_RPC_URL || ''
 const SCHEMA_ID = process.env.NEXT_PUBLIC_SCHEMA_ID || ''
 const PUBLISHER_ADDRESS = process.env.NEXT_PUBLIC_PUBLISHER_ADDRESS || ''
+const STREAMS_CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_SOMNIA_CONTRACT_ADDRESS || ''
 const DEFAULT_PAIR_KEYS = process.env.NEXT_PUBLIC_PAIR_KEYS?.split(',').map((key) => key.trim()).filter(Boolean) || []
 const NORMALIZED_SCHEMA_ID = normalizeSchemaId(SCHEMA_ID)
 
+const somniaStreamsAbi = [
+  {
+    inputs: [
+      { internalType: 'bytes32', name: 'schemaId', type: 'bytes32' },
+      { internalType: 'address', name: 'publisher', type: 'address' },
+      { internalType: 'bytes32', name: 'key', type: 'bytes32' },
+    ],
+    name: 'publisherDataIndex',
+    outputs: [{ internalType: 'uint256', name: 'indexPlusOne', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      { internalType: 'bytes32', name: 'schemaId', type: 'bytes32' },
+      { internalType: 'address', name: 'publisher', type: 'address' },
+      { internalType: 'uint256', name: 'idx', type: 'uint256' },
+    ],
+    name: 'getPublisherDataForSchemaAtIndex',
+    outputs: [{ internalType: 'bytes', name: '', type: 'bytes' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+] as const
+
 const somniaChain = defineChain({
-  id: 50311,
+  id: 50312,
   name: 'Somnia Testnet',
   nativeCurrency: { name: 'STT', symbol: 'STT', decimals: 18 },
   rpcUrls: {
@@ -35,7 +61,7 @@ export function useSomniaStreams(customPairKeys?: string[]) {
   }, [customPairKeys?.join('|')])
 
   useEffect(() => {
-    if (!SOMNIA_RPC_URL || !NORMALIZED_SCHEMA_ID || !PUBLISHER_ADDRESS) {
+    if (!SOMNIA_RPC_URL || !NORMALIZED_SCHEMA_ID || !PUBLISHER_ADDRESS || !STREAMS_CONTRACT_ADDRESS) {
       console.error('Missing Somnia configuration')
       return
     }
@@ -47,14 +73,10 @@ export function useSomniaStreams(customPairKeys?: string[]) {
       pairs: sanitizedPairs,
     })
 
-    // Initialize SDK with public client only (read-only for dashboard)
+    // Initialize read-only client for direct contract reads
     const publicClient = createPublicClient({
       chain: somniaChain,
       transport: http(SOMNIA_RPC_URL),
-    })
-
-    const sdk = new SDK({
-      public: publicClient,
     })
 
     const schemaEncoder = new SchemaEncoder(priceSchema)
@@ -71,18 +93,14 @@ export function useSomniaStreams(customPairKeys?: string[]) {
         for (const key of sanitizedPairs) {
           const streamKey = generatePairKey(key)
           try {
-            const data = await sdk.streams.getByKey(
-              NORMALIZED_SCHEMA_ID,
-              PUBLISHER_ADDRESS as `0x${string}`,
-              streamKey
-            )
-
-            if (data instanceof Error) {
-              console.warn(`Somnia returned error for ${key}:`, data.message)
-              continue
-            }
-
-            const priceData = decodePriceUpdate(schemaEncoder, data)
+            const priceData = await fetchLatestStreamUpdate({
+              client: publicClient,
+              contractAddress: STREAMS_CONTRACT_ADDRESS as `0x${string}`,
+              schemaId: NORMALIZED_SCHEMA_ID,
+              publisher: PUBLISHER_ADDRESS as `0x${string}`,
+              streamKey,
+              schemaEncoder,
+            })
 
             if (priceData) {
               console.log(`Received Somnia data for ${key}:`, priceData)
@@ -132,6 +150,47 @@ function normalizeSchemaId(value: string): `0x${string}` | null {
 
 function generatePairKey(pairKey: string): `0x${string}` {
   return keccak256(toHex(pairKey))
+}
+
+async function fetchLatestStreamUpdate({
+  client,
+  contractAddress,
+  schemaId,
+  publisher,
+  streamKey,
+  schemaEncoder,
+}: {
+  client: ReturnType<typeof createPublicClient>
+  contractAddress: `0x${string}`
+  schemaId: `0x${string}`
+  publisher: `0x${string}`
+  streamKey: `0x${string}`
+  schemaEncoder: SchemaEncoder
+}): Promise<PriceData | null> {
+  try {
+    const indexPlusOne = (await client.readContract({
+      address: contractAddress,
+      abi: somniaStreamsAbi,
+      functionName: 'publisherDataIndex',
+      args: [schemaId, publisher, streamKey],
+    })) as bigint
+
+    if (!indexPlusOne || indexPlusOne === BigInt(0)) {
+      return null
+    }
+
+    const payload = await client.readContract({
+      address: contractAddress,
+      abi: somniaStreamsAbi,
+      functionName: 'getPublisherDataForSchemaAtIndex',
+      args: [schemaId, publisher, indexPlusOne - BigInt(1)],
+    })
+
+    return decodePriceUpdate(schemaEncoder, payload)
+  } catch (error) {
+    console.warn('Somnia Streams contract read failed:', (error as Error).message)
+    return null
+  }
 }
 
 async function seedFallbackPrices(pairKeys: string[], updatePair: (key: string, data: PriceData) => void) {
