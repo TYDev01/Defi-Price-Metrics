@@ -1,9 +1,10 @@
-import { createWalletClient, http } from 'viem';
+import { createWalletClient, createPublicClient, http } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { logger } from '../utils/logger';
 import { encodePriceData, generatePairKey, PriceData } from '../schema/encoder';
 import config from '../config';
 import { defineChain } from 'viem';
+import { SDK } from '@somnia-chain/streams';
 
 const somniaChain = defineChain({
   id: 50312,
@@ -32,21 +33,38 @@ export class SomniaStreamsWriter {
   private options: BatchWriterOptions;
   private isWriting = false;
 
+  private publicClient = createPublicClient({
+    chain: somniaChain,
+    transport: http(config.somnia.rpcUrl),
+  });
+
+  private walletClient = createWalletClient({
+    account: privateKeyToAccount(config.somnia.privateKey),
+    chain: somniaChain,
+    transport: http(config.somnia.rpcUrl),
+  });
+
   constructor(options: BatchWriterOptions) {
     this.options = options;
     this.account = privateKeyToAccount(config.somnia.privateKey);
 
-    logger.info(`Somnia Streams Writer initialized for account: ${this.account.address}`);
+    logger.info(
+      `Somnia Streams Writer initialized for account: ${this.account.address}`,
+    );
   }
 
   /**
    * Queue a price update for batching
    */
-  public async queueUpdate(chain: string, pairAddress: string, priceData: PriceData): Promise<void> {
+  public async queueUpdate(
+    chain: string,
+    pairAddress: string,
+    priceData: PriceData,
+  ): Promise<void> {
     const key = generatePairKey(chain, pairAddress);
 
     const update: StreamUpdate = {
-      id: key, // key is already 0x-prefixed from keccak256
+      id: key,
       schemaId: config.somnia.schemaId,
       data: encodePriceData(priceData),
     };
@@ -55,7 +73,6 @@ export class SomniaStreamsWriter {
 
     logger.debug(`Queued update for ${key}, pending: ${this.pendingUpdates.size}`);
 
-    // Trigger immediate write if batch size reached
     if (this.pendingUpdates.size >= this.options.batchSize) {
       await this.flush();
     } else {
@@ -67,17 +84,13 @@ export class SomniaStreamsWriter {
    * Schedule batch write
    */
   private scheduleBatch(): void {
-    if (this.batchTimer) {
-      return; // Timer already scheduled
-    }
+    if (this.batchTimer) return;
 
-    this.batchTimer = setTimeout(() => {
-      this.flush();
-    }, this.options.batchIntervalMs);
+    this.batchTimer = setTimeout(() => this.flush(), this.options.batchIntervalMs);
   }
 
   /**
-   * Flush pending updates to Somnia Streams
+   * Flush pending updates
    */
   public async flush(): Promise<void> {
     if (this.batchTimer) {
@@ -85,9 +98,7 @@ export class SomniaStreamsWriter {
       this.batchTimer = null;
     }
 
-    if (this.pendingUpdates.size === 0 || this.isWriting) {
-      return;
-    }
+    if (this.pendingUpdates.size === 0 || this.isWriting) return;
 
     this.isWriting = true;
 
@@ -98,114 +109,56 @@ export class SomniaStreamsWriter {
 
     try {
       await this.writeToStreams(updates);
-      logger.info(`Successfully wrote ${updates.length} updates to Somnia Streams`);
+      logger.info(`Successfully wrote ${updates.length} updates`);
     } catch (error) {
       logger.error('Failed to write to Somnia Streams:', error);
-      
-      // Re-queue failed updates
+
+      // requeue
       for (const update of updates) {
         this.pendingUpdates.set(update.id, update);
       }
-      
-      // Retry after delay
-      setTimeout(() => {
-        this.flush();
-      }, 5000);
+
+      setTimeout(() => this.flush(), 5000);
     } finally {
       this.isWriting = false;
     }
   }
 
   /**
-   * Write updates to Somnia Streams using custom contract address
+   * Correct Somnia write using the SDK
    */
   private async writeToStreams(updates: StreamUpdate[]): Promise<void> {
-    logger.debug('Writing to Somnia Streams:', {
+    const sdk = new SDK({
+      public: this.publicClient,
+      wallet: this.walletClient,
+    });
+
+    logger.debug(' Writing to Somnia Streams via SDK:', {
       count: updates.length,
-      schemaId: config.somnia.schemaId.toString(),
+      schemaId: config.somnia.schemaId,
       publisher: this.account.address,
-      contractAddress: config.somnia.contractAddress,
     });
 
-    try {
-      // Write directly to the custom contract address
-      await this.writeDirectToContract(updates);
-      logger.info(`Successfully wrote to Somnia contract ${config.somnia.contractAddress}`);
-    } catch (error: any) {
-      logger.error('Somnia write error:', error);
-      throw error;
+    const txHash = await sdk.streams.set(updates);
+
+    if (!txHash) {
+      throw new Error('Somnia returned no tx hash for write');
     }
+
+    logger.info(`Somnia write tx: ${txHash}`);
   }
 
   /**
-   * Write directly to custom contract address
-   */
-  private async writeDirectToContract(updates: StreamUpdate[]): Promise<void> {
-    const walletClient = createWalletClient({
-      account: this.account,
-      chain: somniaChain,
-      transport: http(config.somnia.rpcUrl),
-    });
-
-    // ABI for the esstores function
-    const abi = [
-      {
-        inputs: [
-          {
-            components: [
-              { name: 'id', type: 'bytes32' },
-              { name: 'schemaId', type: 'bytes32' },
-              { name: 'data', type: 'bytes' },
-            ],
-            name: 'dataStreams',
-            type: 'tuple[]',
-          },
-        ],
-        name: 'esstores',
-        outputs: [],
-        stateMutability: 'nonpayable',
-        type: 'function',
-      },
-    ] as const;
-
-    try {
-      const txHash = await walletClient.writeContract({
-        address: config.somnia.contractAddress,
-        abi,
-        functionName: 'esstores',
-        args: [updates as any],
-        gas: BigInt(10000000), // 10M gas limit
-      });
-
-      logger.info(`Somnia write transaction: ${txHash}`);
-    } catch (error: any) {
-      // Log detailed error for debugging
-      logger.error('Transaction failed:', {
-        error: error.message,
-        updates: updates.length,
-        contract: config.somnia.contractAddress,
-        account: this.account.address,
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Cleanup and flush on shutdown
+   * Cleanup
    */
   public async shutdown(): Promise<void> {
     logger.info('Shutting down Somnia Streams Writer');
-    
-    if (this.batchTimer) {
-      clearTimeout(this.batchTimer);
-    }
-    
+
+    if (this.batchTimer) clearTimeout(this.batchTimer);
+
     await this.flush();
   }
 
-  /**
-   * Get pending update count
-   */
   public getPendingCount(): number {
     return this.pendingUpdates.size;
   }

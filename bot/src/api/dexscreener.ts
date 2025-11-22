@@ -168,8 +168,8 @@ export class DexScreenerAPI {
         logger.debug(`${pair.symbol}: $${parseFloat(priceUsd).toFixed(6)}`);
       }
     } catch (error) {
-      const err = error instanceof Error ? error : new Error('Failed to fetch pair data');
-      logger.error(`Error fetching data for ${key}:`, err.message);
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error(`Error fetching data for ${key}:`, err);
       this.options.onError(pair.chain, pair.pairAddress, err);
     }
   }
