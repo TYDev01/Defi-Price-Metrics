@@ -8,15 +8,8 @@ export interface ManagedPair {
   label?: string
 }
 
-const basePairs: ManagedPair[] = (process.env.NEXT_PUBLIC_PAIR_KEYS || '')
-  .split(',')
-  .map((key) => key.trim())
-  .filter(Boolean)
-  .map((entry) => {
-    const [chain, address] = entry.split(':')
-    return { chain: chain?.toLowerCase() || '', address: address?.toLowerCase() || '' }
-  })
-  .filter((pair) => pair.chain && pair.address)
+// No longer using env-based pairs - everything comes from Firebase
+const basePairs: ManagedPair[] = []
 
 const dedupePairs = (pairs: ManagedPair[]): ManagedPair[] => {
   const seen = new Set<string>()
@@ -80,7 +73,7 @@ export const usePairRegistry = create<PairRegistryState>((set, get) => ({
       const adminPairs = Array.isArray(data.pairs) ? (data.pairs as ManagedPair[]) : []
       set({
         adminPairs,
-        combinedPairs: dedupePairs([...get().basePairs, ...adminPairs]),
+        combinedPairs: dedupePairs(adminPairs), // Only use Firebase pairs
         isLoading: false,
         error: null,
       })
@@ -102,10 +95,9 @@ export const usePairRegistry = create<PairRegistryState>((set, get) => ({
     }
 
     const key = pairKey(normalized)
-    const existsInBase = basePairs.some((base) => pairKey(base) === key)
     const existsInAdmin = get().adminPairs.some((existing) => pairKey(existing) === key)
 
-    if (existsInBase || existsInAdmin) {
+    if (existsInAdmin) {
       throw new Error('Pair already exists')
     }
 
@@ -123,7 +115,7 @@ export const usePairRegistry = create<PairRegistryState>((set, get) => ({
     const updated = [...get().adminPairs, normalized]
     set({
       adminPairs: updated,
-      combinedPairs: dedupePairs([...get().basePairs, ...updated]),
+      combinedPairs: dedupePairs(updated), // Only use Firebase pairs
     })
   },
 
@@ -146,7 +138,7 @@ export const usePairRegistry = create<PairRegistryState>((set, get) => ({
     const filtered = get().adminPairs.filter((pair) => pairKey(pair) !== key.toLowerCase())
     set({
       adminPairs: filtered,
-      combinedPairs: dedupePairs([...get().basePairs, ...filtered]),
+      combinedPairs: dedupePairs(filtered), // Only use Firebase pairs
     })
   },
 }))

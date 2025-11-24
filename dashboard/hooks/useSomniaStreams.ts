@@ -73,6 +73,13 @@ export function useSomniaStreams(customPairKeys?: string[]) {
       pairs: sanitizedPairs,
     })
 
+    // Debug: Log the stream keys being generated
+    console.log('Stream keys being polled:')
+    sanitizedPairs.forEach(key => {
+      const streamKey = generatePairKey(key)
+      console.log(`  ${key} -> ${streamKey}`)
+    })
+
     // Initialize read-only client for direct contract reads
     const publicClient = createPublicClient({
       chain: somniaChain,
@@ -82,17 +89,17 @@ export function useSomniaStreams(customPairKeys?: string[]) {
     const schemaEncoder = new SchemaEncoder(priceSchema)
     setConnected(true)
 
-    // Seed UI with current DexScreener prices while waiting for Somnia data
-    seedFallbackPrices(sanitizedPairs, updatePair).catch((error) => {
-      console.warn('DexScreener fallback failed:', error)
-    })
+    console.log('Polling Somnia Data Streams only - no external APIs')
 
     // Poll for updates from Somnia Data Streams
     const pollInterval = setInterval(async () => {
       try {
-        for (const key of sanitizedPairs) {
-          const streamKey = generatePairKey(key)
-          try {
+        console.log(`Polling ${sanitizedPairs.length} pairs from Somnia...`)
+        
+        // Query all pairs in parallel for better performance
+        const results = await Promise.allSettled(
+          sanitizedPairs.map(async (key) => {
+            const streamKey = generatePairKey(key)
             const priceData = await fetchLatestStreamUpdate({
               client: publicClient,
               contractAddress: STREAMS_CONTRACT_ADDRESS as `0x${string}`,
@@ -101,23 +108,40 @@ export function useSomniaStreams(customPairKeys?: string[]) {
               streamKey,
               schemaEncoder,
             })
+            return { key, priceData }
+          })
+        )
 
+        let successCount = 0
+        let noDataCount = 0
+        let errorCount = 0
+        
+        // Process results
+        results.forEach((result, index) => {
+          const key = sanitizedPairs[index]
+          
+          if (result.status === 'fulfilled') {
+            const { priceData } = result.value
             if (priceData) {
-              console.log(`Received Somnia data for ${key}:`, priceData)
+              successCount++
+              console.log(`✅ ${key}: $${(Number(priceData.priceUsd) / 1e18).toFixed(2)}`)
 
               updatePair(key, priceData)
               
               const price = Number(priceData.priceUsd) / 1e18
               const time = Number(priceData.timestamp)
               addHistoryPoint(key, time, price)
-              console.log(`Updated ${key} with price: $${price.toFixed(2)}`)
             } else {
-              console.log(`No decodable data from Somnia for ${key}`)
+              noDataCount++
+              console.log(`⚠️  ${key}: No data yet`)
             }
-          } catch (keyError: any) {
-            console.warn(`Error fetching data for ${key}:`, keyError.message)
+          } else {
+            errorCount++
+            console.warn(`❌ ${key}: ${result.reason?.message || result.reason}`)
           }
-        }
+        })
+        
+        console.log(`Poll complete: ${successCount} success, ${noDataCount} no data, ${errorCount} errors`)
       } catch (error: any) {
         console.error('Somnia Streams polling error:', error)
         setError(error.message)
@@ -175,7 +199,10 @@ async function fetchLatestStreamUpdate({
       args: [schemaId, publisher, streamKey],
     })) as bigint
 
+    console.log(`Stream ${streamKey}: indexPlusOne = ${indexPlusOne}`)
+
     if (!indexPlusOne || indexPlusOne === BigInt(0)) {
+      console.warn(`No data index for stream ${streamKey}`)
       return null
     }
 
@@ -186,57 +213,12 @@ async function fetchLatestStreamUpdate({
       args: [schemaId, publisher, indexPlusOne - BigInt(1)],
     })
 
+    console.log(`Stream ${streamKey}: Got payload`, payload)
+
     return decodePriceUpdate(schemaEncoder, payload)
   } catch (error) {
-    console.warn('Somnia Streams contract read failed:', (error as Error).message)
+    console.error('Somnia Streams contract read failed for', streamKey, ':', (error as Error).message)
     return null
-  }
-}
-
-async function seedFallbackPrices(pairKeys: string[], updatePair: (key: string, data: PriceData) => void) {
-  if (!pairKeys.length) return
-
-  for (const key of pairKeys) {
-    try {
-      const fallback = await fetchDexscreenerSnapshot(key)
-      if (fallback) {
-        updatePair(key, fallback)
-      }
-    } catch (error) {
-      console.warn(`Failed to fetch DexScreener snapshot for ${key}:`, (error as Error).message)
-    }
-  }
-}
-
-async function fetchDexscreenerSnapshot(pairKey: string): Promise<PriceData | null> {
-  const [chain, address] = pairKey.split(':')
-  if (!chain || !address) {
-    return null
-  }
-
-  const url = `https://api.dexscreener.com/latest/dex/pairs/${chain}/${address}`
-  const response = await fetch(url)
-
-  if (!response.ok) {
-    throw new Error(`DexScreener HTTP ${response.status}`)
-  }
-
-  const payload = await response.json()
-  const pair = payload?.pairs?.[0]
-
-  if (!pair || !pair.priceUsd) {
-    return null
-  }
-
-  return {
-    timestamp: BigInt(Math.floor(Date.now() / 1000)),
-    pair: `${pair.baseToken.symbol}/${pair.quoteToken.symbol}`,
-    chain: pair.chainId,
-    priceUsd: toUint256(parseFloat(pair.priceUsd)),
-    liquidity: toUint256(pair.liquidity?.usd ?? 0),
-    volume24h: toUint256(pair.volume?.h24 ?? 0),
-    priceChange1h: toBasisPoints(pair.priceChange?.h1 ?? 0),
-    priceChange24h: toBasisPoints(pair.priceChange?.h24 ?? 0),
   }
 }
 
