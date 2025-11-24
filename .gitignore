@@ -58,3 +58,12 @@ PROJECT_README.md
 
 bot/check-somnia-write.js
 test-somnia-read.js
+STORAGE_MONITOR_README.md
+ADMIN_PANEL_FIX.md
+AWS_DEPLOYMENT_GUIDE.md
+DEPLOYMENT_SUMMARY.md
+VERCEL_DEPLOYMENT.md
+dashboard/deploy-with-firebase.sh
+dashboard/setup-vercel-env.sh
+dashboard/.env.production
+dashboard/.env.vercel.local

@@ -4,6 +4,12 @@ import { create } from 'zustand'
 
 const publisherAddress = (process.env.NEXT_PUBLIC_PUBLISHER_ADDRESS || '').toLowerCase()
 
+// Debug log (remove after testing)
+if (typeof window !== 'undefined') {
+  console.log('Publisher address configured:', publisherAddress)
+  console.log('Raw env value:', process.env.NEXT_PUBLIC_PUBLISHER_ADDRESS)
+}
+
 declare global {
   interface Window {
     ethereum?: {
@@ -54,5 +60,14 @@ export const useWalletStore = create<WalletState>((set) => ({
 export function useIsPublisher(): boolean {
   const address = useWalletStore((state) => state.address)
   if (!address) return false
+  
+  // Debug log (remove after testing)
+  if (typeof window !== 'undefined') {
+    console.log('Checking publisher status:')
+    console.log('  Connected address:', address.toLowerCase())
+    console.log('  Publisher address:', publisherAddress)
+    console.log('  Match:', address.toLowerCase() === publisherAddress)
+  }
+  
   return address.toLowerCase() === publisherAddress
 }
