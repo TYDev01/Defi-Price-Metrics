@@ -3,7 +3,8 @@
 import { useEffect, useMemo } from 'react'
 import { usePriceStore, type PriceData } from '@/lib/store'
 import { SchemaEncoder } from '@somnia-chain/streams'
-import { createPublicClient, http, defineChain, keccak256, toHex } from 'viem'
+import { createPublicClient, http, defineChain } from 'viem'
+import { computeStreamId } from '../lib/streamId'
 
 const SOMNIA_RPC_URL = process.env.NEXT_PUBLIC_SOMNIA_RPC_URL || ''
 const SCHEMA_ID = process.env.NEXT_PUBLIC_SCHEMA_ID || ''
@@ -173,7 +174,16 @@ function normalizeSchemaId(value: string): `0x${string}` | null {
 }
 
 function generatePairKey(pairKey: string): `0x${string}` {
-  return keccak256(toHex(pairKey))
+  // Split the pairKey (format: "chain:address") and use shared utility
+  const [chain, address] = pairKey.split(':')
+  if (!chain || !address) {
+    console.error('Invalid pairKey format:', pairKey)
+    // Can't fallback without imports, throw error
+    throw new Error(`Invalid pairKey format: ${pairKey}`)
+  }
+  
+  // Use the shared computeStreamId function to ensure consistency
+  return computeStreamId(chain, address)
 }
 
 async function fetchLatestStreamUpdate({

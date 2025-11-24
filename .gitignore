@@ -67,3 +67,7 @@ dashboard/deploy-with-firebase.sh
 dashboard/setup-vercel-env.sh
 dashboard/.env.production
 dashboard/.env.vercel.local
+firebase-service-account.json
+shared/.env.local
+shared/.env.development.local
+bot/test-streamid.js

@@ -1,6 +1,6 @@
 import { SDK, SchemaEncoder } from '@somnia-chain/streams'
 import { createPublicClient, http, Hex, defineChain } from 'viem'
-import { keccak256, toHex } from 'viem'
+import { computeStreamId } from './streamId'
 
 const SOMNIA_RPC_URL = process.env.NEXT_PUBLIC_SOMNIA_RPC_URL || 'https://dream-rpc.somnia.network'
 const SCHEMA_ID = process.env.NEXT_PUBLIC_SCHEMA_ID as `0x${string}`
@@ -57,11 +57,10 @@ export interface HistoryLoadOptions {
 }
 
 /**
- * Generate pair key (same as bot logic)
+ * Generate pair key using shared utility for consistency
  */
 export function generatePairKey(chain: string, pairAddress: string): `0x${string}` {
-  const keyString = `${chain}:${pairAddress}`
-  return keccak256(toHex(keyString))
+  return computeStreamId(chain, pairAddress)
 }
 
 /**
