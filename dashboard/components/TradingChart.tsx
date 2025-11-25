@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef } from 'react'
 import { createChart, ColorType, IChartApi, ISeriesApi, type UTCTimestamp } from 'lightweight-charts'
-import { usePriceStore } from '@/lib/store'
+import { useSomniaPriceHistory } from '@/hooks/useSomniaPriceHistory'
 import { Card } from '@/components/ui/card'
 
 interface TradingChartProps {
@@ -14,7 +14,16 @@ export function TradingChart({ pairKey }: TradingChartProps) {
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<'Line'> | null>(null)
   
-  const history = usePriceStore((state) => state.getPair(pairKey)?.history || [])
+  // Parse chain and pairAddress from pairKey (format: "chain:address")
+  const [chain, pairAddress] = pairKey.split(':')
+  
+  // Load historical data from Somnia Data Streams
+  const { history, isLoading, error, lastUpdate } = useSomniaPriceHistory(chain, pairAddress, {
+    refreshInterval: 90000, // Refresh every 90 seconds
+    maxEntries: 1000,
+    autoRefresh: true,
+    mode: 'recent',
+  })
 
   useEffect(() => {
     if (!chartContainerRef.current) return
@@ -69,7 +78,10 @@ export function TradingChart({ pairKey }: TradingChartProps) {
   }, [])
 
   const chartHistory = useMemo(
-    () => history.map(({ time, value }) => ({ time: Math.floor(time) as UTCTimestamp, value })),
+    () => history.map((point) => ({ 
+      time: Math.floor(point.timestamp) as UTCTimestamp, 
+      value: point.priceUsd 
+    })),
     [history]
   )
 
@@ -81,9 +93,20 @@ export function TradingChart({ pairKey }: TradingChartProps) {
 
   return (
     <Card className="p-6">
-      <div className="mb-4">
-        <h2 className="text-lg font-semibold">Price Chart</h2>
-        <p className="text-sm text-muted-foreground">Real-time price movements</p>
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold">Price Chart</h2>
+          <p className="text-sm text-muted-foreground">
+            {isLoading ? 'Loading historical data from Somnia...' : 
+             error ? `Error: ${error}` :
+             `${history.length} data points from Somnia Data Streams`}
+          </p>
+        </div>
+        {lastUpdate && (
+          <div className="text-xs text-muted-foreground">
+            Last updated: {lastUpdate.toLocaleTimeString()}
+          </div>
+        )}
       </div>
       <div ref={chartContainerRef} className="chart-container" />
     </Card>

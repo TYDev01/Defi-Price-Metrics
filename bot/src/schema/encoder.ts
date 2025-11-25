@@ -1,5 +1,5 @@
-import { keccak256, toHex } from 'viem';
 import { SchemaEncoder } from '@somnia-chain/streams';
+import { computeStreamId } from '../utils/computeStreamId';
 
 /**
  * Schema definition for price data
@@ -145,10 +145,8 @@ export function encodePriceData(data: PriceData): `0x${string}` {
 
 /**
  * Generate unique key for a trading pair as bytes32
- * Uses keccak256 hash to convert chain:address to proper bytes32 format
+ * Uses shared utility to ensure consistency with dashboard
  */
 export function generatePairKey(chain: string, pairAddress: string): `0x${string}` {
-  const keyString = `${chain}:${pairAddress}`;
-  // keccak256 already returns 0x-prefixed hex, toHex converts string to bytes
-  return keccak256(toHex(keyString));
+  return computeStreamId(chain, pairAddress);
 }

@@ -30,12 +30,12 @@ export interface PairConfig {
 }
 
 /**
- * Parse pairs from environment variable
+ * Parse pairs from environment variable (optional - Firebase is primary source)
  * Format: "solana:4RsXTiPDP3q...:SOL/USDC,ethereum:0xabc...:ETH/USDC"
  */
 function parsePairs(pairsEnv: string | undefined): PairConfig[] {
   if (!pairsEnv) {
-    throw new Error('PAIRS environment variable is required');
+    return []; // Return empty array, Firebase will provide pairs
   }
 
   return pairsEnv.split(',').map((pairStr) => {
@@ -51,7 +51,7 @@ function parsePairs(pairsEnv: string | undefined): PairConfig[] {
  * Validate required environment variables
  */
 function validateConfig() {
-  const required = ['SOMNIA_RPC_URL', 'SOMNIA_PRIVATE_KEY', 'PAIRS', 'SOMNIA_SCHEMA_ID', 'PUBLISHER_ADDRESS'];
+  const required = ['SOMNIA_RPC_URL', 'SOMNIA_PRIVATE_KEY', 'SOMNIA_SCHEMA_ID', 'PUBLISHER_ADDRESS'];
   const missing = required.filter((key) => !process.env[key]);
 
   if (missing.length > 0) {

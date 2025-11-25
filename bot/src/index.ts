@@ -3,8 +3,9 @@ import { DexScreenerAPI } from './api/dexscreener';
 import { SomniaStreamsWriter } from './streams/writer';
 import { PriceDeduplicator } from './utils/deduplicator';
 import { parseDexScreenerUpdate, generatePairKey } from './schema/encoder';
-import config from './config';
+import config, { PairConfig } from './config';
 import { TelegramNotifier } from './notifications/telegram';
+import { FirebaseSync } from './services/firebase-sync';
 
 /**
  * Main application class
@@ -13,11 +14,15 @@ class PriceStreamingBot {
   private dexscreenerAPI: DexScreenerAPI;
   private streamsWriter: SomniaStreamsWriter;
   private deduplicator: PriceDeduplicator;
+  private firebaseSync: FirebaseSync;
   private isRunning = false;
   private telegramNotifier?: TelegramNotifier;
+  private activePairs = new Map<string, PairConfig>();
+  private syncInterval?: NodeJS.Timeout;
 
   constructor() {
     this.deduplicator = new PriceDeduplicator();
+    this.firebaseSync = new FirebaseSync();
 
     this.streamsWriter = new SomniaStreamsWriter({
       batchSize: config.somnia.batchSize,
@@ -52,15 +57,21 @@ class PriceStreamingBot {
     }
 
     logger.info('Starting Price Streaming Bot');
-    logger.info(`Monitoring ${config.pairs.length} pairs`);
     logger.info('Using DexScreener REST API (polling every 10 seconds)');
 
-    // Start monitoring each configured pair
-    for (const pair of config.pairs) {
-      this.dexscreenerAPI.startPair(pair);
-    }
+    // Load initial pairs
+    await this.syncPairs();
 
     this.isRunning = true;
+
+    // Start periodic pair sync (required)
+    if (this.firebaseSync.isEnabled()) {
+      logger.info('Firebase sync enabled - will check for new pairs every 60 seconds');
+      this.syncInterval = setInterval(() => this.syncPairs(), 60000);
+    } else {
+      logger.error('Firebase sync is required but not enabled - bot cannot function');
+      throw new Error('Firebase configuration is required. Please set up firebase-service-account.json');
+    }
 
     // Set up graceful shutdown
     this.setupShutdownHandlers();
@@ -70,6 +81,85 @@ class PriceStreamingBot {
 
     // Kick off Telegram digest loop if configured
     this.telegramNotifier?.start();
+  }
+
+  /**
+   * Sync pairs from Firebase only
+   */
+  private async syncPairs(): Promise<void> {
+    try {
+      // Only use pairs from Firebase
+      const allPairs: PairConfig[] = [];
+
+      if (this.firebaseSync.isEnabled()) {
+        const adminPairs = await this.firebaseSync.fetchAdminPairs();
+        for (const managedPair of adminPairs) {
+          allPairs.push(this.firebaseSync.toPairConfig(managedPair));
+        }
+      } else {
+        logger.error('Firebase sync is not enabled - no pairs to monitor!');
+        logger.error('Please configure Firebase service account to use the bot');
+        return;
+      }
+
+      // Deduplicate by chain:address
+      const uniquePairs = new Map<string, PairConfig>();
+      for (const pair of allPairs) {
+        const key = `${pair.chain}:${pair.pairAddress}`.toLowerCase();
+        if (!uniquePairs.has(key)) {
+          uniquePairs.set(key, pair);
+        }
+      }
+
+      // Find new pairs to start monitoring
+      const newPairs: PairConfig[] = [];
+      for (const [key, pair] of uniquePairs) {
+        if (!this.activePairs.has(key)) {
+          newPairs.push(pair);
+          this.activePairs.set(key, pair);
+        }
+      }
+
+      // Find removed pairs to stop monitoring
+      const removedKeys: string[] = [];
+      for (const key of this.activePairs.keys()) {
+        if (!uniquePairs.has(key)) {
+          removedKeys.push(key);
+        }
+      }
+
+      // Start monitoring new pairs
+      if (newPairs.length > 0) {
+        logger.info(`Starting monitoring for ${newPairs.length} new pairs`);
+        for (const pair of newPairs) {
+          const pairKey = generatePairKey(pair.chain, pair.pairAddress);
+          this.dexscreenerAPI.startPair(pair);
+          logger.info(`  + ${pair.chain}:${pair.pairAddress} (${pair.symbol})`);
+          logger.info(`    Stream key: ${pairKey}`);
+        }
+      }
+
+      // Stop monitoring removed pairs
+      if (removedKeys.length > 0) {
+        logger.info(`Stopping monitoring for ${removedKeys.length} removed pairs`);
+        for (const key of removedKeys) {
+          const pair = this.activePairs.get(key);
+          if (pair) {
+            this.dexscreenerAPI.stopPair(pair.chain, pair.pairAddress);
+            this.activePairs.delete(key);
+            logger.info(`  - ${key}`);
+          }
+        }
+      }
+
+      if (newPairs.length === 0 && removedKeys.length === 0) {
+        logger.debug(`Pair sync complete: ${this.activePairs.size} pairs active (no changes)`);
+      } else {
+        logger.info(`Pair sync complete: ${this.activePairs.size} pairs active`);
+      }
+    } catch (error) {
+      logger.error('Error syncing pairs:', error);
+    }
   }
 
   /**
@@ -125,6 +215,8 @@ class PriceStreamingBot {
     }, 60000); // Every 60 seconds
   }
 
+
+
   /**
    * Set up graceful shutdown handlers
    */
@@ -161,6 +253,12 @@ class PriceStreamingBot {
     logger.info('Stopping Price Streaming Bot');
 
     this.isRunning = false;
+
+    // Stop pair sync interval
+    if (this.syncInterval) {
+      clearInterval(this.syncInterval);
+      this.syncInterval = undefined;
+    }
 
     // Stop all polling
     this.dexscreenerAPI.stopAll();

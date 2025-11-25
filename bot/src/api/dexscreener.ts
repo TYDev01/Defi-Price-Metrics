@@ -135,42 +135,74 @@ export class DexScreenerAPI {
   }
 
   /**
-   * Fetch pair data from DexScreener REST API
+   * Fetch pair data from DexScreener REST API with timeout and retry
    */
-  private async fetchPairData(pair: PairConfig): Promise<void> {
+  private async fetchPairData(pair: PairConfig, retries = 2): Promise<void> {
     const key = this.getPairKey(pair.chain, pair.pairAddress);
     const url = `${this.baseUrl}/${pair.chain}/${pair.pairAddress}`;
 
-    try {
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        // Add timeout controller (30 seconds)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+        try {
+          const response = await fetch(url, { 
+            signal: controller.signal,
+            headers: {
+              'Accept': 'application/json',
+              'User-Agent': 'DefiPrice/1.0'
+            }
+          });
+          
+          clearTimeout(timeoutId);
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          const data = await response.json() as DexScreenerResponse;
+
+          if (!data.pairs || data.pairs.length === 0) {
+            logger.warn(`No pair data found for ${key}`);
+            return;
+          }
+
+          // Convert to SSE-compatible format
+          const updateData: DexScreenerUpdate = {
+            schemaVersion: data.schemaVersion,
+            pairs: data.pairs,
+          };
+
+          this.options.onUpdate(pair.chain, pair.pairAddress, updateData);
+          
+          const priceUsd = data.pairs[0].priceUsd;
+          if (priceUsd) {
+            logger.debug(`${pair.symbol}: $${parseFloat(priceUsd).toFixed(6)}`);
+          }
+          
+          // Success - exit retry loop
+          return;
+        } catch (fetchError) {
+          clearTimeout(timeoutId);
+          throw fetchError;
+        }
+      } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        
+        // If this is the last attempt, log error and give up
+        if (attempt === retries) {
+          logger.error(`Error fetching data for ${key} after ${retries + 1} attempts:`, err);
+          this.options.onError(pair.chain, pair.pairAddress, err);
+          return;
+        }
+        
+        // Wait before retry (exponential backoff)
+        const delay = Math.min(1000 * Math.pow(2, attempt), 5000);
+        logger.debug(`Retry ${attempt + 1}/${retries} for ${key} in ${delay}ms`);
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
-
-      const data = await response.json() as DexScreenerResponse;
-
-      if (!data.pairs || data.pairs.length === 0) {
-        logger.warn(`No pair data found for ${key}`);
-        return;
-      }
-
-      // Convert to SSE-compatible format
-      const updateData: DexScreenerUpdate = {
-        schemaVersion: data.schemaVersion,
-        pairs: data.pairs,
-      };
-
-      this.options.onUpdate(pair.chain, pair.pairAddress, updateData);
-      
-      const priceUsd = data.pairs[0].priceUsd;
-      if (priceUsd) {
-        logger.debug(`${pair.symbol}: $${parseFloat(priceUsd).toFixed(6)}`);
-      }
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      logger.error(`Error fetching data for ${key}:`, err);
-      this.options.onError(pair.chain, pair.pairAddress, err);
     }
   }
 

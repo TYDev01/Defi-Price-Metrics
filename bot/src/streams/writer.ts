@@ -125,20 +125,24 @@ export class SomniaStreamsWriter {
   }
 
   /**
-   * Correct Somnia write using the SDK
+   * Write to Somnia Streams using direct contract calls with keys
    */
   private async writeToStreams(updates: StreamUpdate[]): Promise<void> {
+    // Write each update with its specific key using the SDK's publish method
     const sdk = new SDK({
       public: this.publicClient,
       wallet: this.walletClient,
     });
 
-    logger.debug(' Writing to Somnia Streams via SDK:', {
+    logger.debug('Writing to Somnia Streams with keys:', {
       count: updates.length,
       schemaId: config.somnia.schemaId,
       publisher: this.account.address,
+      updates: updates.map(u => ({ key: u.id, dataSize: u.data.length })),
     });
 
+    // Use the SDK's set method - it should handle keyed writes
+    // The format { schemaId, id (key), data } should be correct
     const txHash = await sdk.streams.set(updates);
 
     if (!txHash) {
@@ -146,6 +150,11 @@ export class SomniaStreamsWriter {
     }
 
     logger.info(`Somnia write tx: ${txHash}`);
+    
+    // Log what was written for debugging
+    for (const update of updates) {
+      logger.debug(`  Wrote key ${update.id}`);
+    }
   }
 
   /**

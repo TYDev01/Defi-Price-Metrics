@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { usePriceStore } from '@/lib/store'
@@ -11,27 +11,63 @@ import { TrendingUp, TrendingDown } from 'lucide-react'
 import { usePairRegistry, pairKey as buildPairKey } from '@/lib/pair-registry'
 
 export function PairList() {
+  const [hydrated, setHydrated] = useState(false)
   const combinedPairs = usePairRegistry((state) => state.combinedPairs)
   const pairKeys = useMemo(() => combinedPairs.map((pair) => buildPairKey(pair)), [combinedPairs])
 
   useSomniaStreams(pairKeys)
   
-  const pairs = usePriceStore((state) => Array.from(state.pairs.values()))
+  const pairsFromStore = usePriceStore((state) => Array.from(state.pairs.values()))
+
+  // Create a map of pairs with data
+  const pairsMap = useMemo(() => {
+    const map = new Map()
+    pairsFromStore.forEach(pair => map.set(pair.key, pair))
+    return map
+  }, [pairsFromStore])
+
+  useEffect(() => {
+    setHydrated(true)
+  }, [])
+
+  // Merge configured pairs with data from store
+  const allPairs = useMemo(() => {
+    return pairKeys.map(key => ({
+      key,
+      data: pairsMap.get(key)?.data || null,
+      hasData: pairsMap.has(key),
+    }))
+  }, [pairKeys, pairsMap])
 
   const sortedPairs = useMemo(() => {
-    return [...pairs].sort((a, b) => {
-      const aChange = a.data?.priceChange24h || 0
-      const bChange = b.data?.priceChange24h || 0
-      return bChange - aChange
+    // Sort: pairs with data first (by change), then pairs without data
+    return [...allPairs].sort((a, b) => {
+      if (a.hasData && !b.hasData) return -1
+      if (!a.hasData && b.hasData) return 1
+      if (a.hasData && b.hasData) {
+        const aChange = a.data?.priceChange24h || 0
+        const bChange = b.data?.priceChange24h || 0
+        return bChange - aChange
+      }
+      return 0
     })
-  }, [pairs])
+  }, [allPairs])
 
-  if (pairs.length === 0) {
+  // Avoid hydration mismatches by waiting for client hydration
+  if (!hydrated) {
     return (
       <div className="rounded-xl border border-dashed border-muted-foreground/30 p-10 text-center">
-        <p className="text-lg font-medium">Listening for live market data…</p>
+        <p className="text-lg font-medium">Loading pairs...</p>
+      </div>
+    )
+  }
+
+  if (allPairs.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-muted-foreground/30 p-10 text-center">
+        <p className="text-lg font-medium">No pairs configured</p>
         <p className="text-sm text-muted-foreground mt-2">
-          Prices will appear as soon as the first update arrives from Somnia Streams.
+          Add pairs in the admin panel to start tracking prices.
         </p>
       </div>
     )
@@ -47,7 +83,52 @@ export function PairList() {
 }
 
 function PairCard({ pair, index }: { pair: any; index: number }) {
-  if (!pair.data) return null
+  const [chain, address] = pair.key.split(':')
+  
+  // Show skeleton/placeholder for pairs without data
+  if (!pair.data) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: index * 0.05 }}
+      >
+        <Card className="p-6 border-dashed opacity-60">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <div className="flex items-center space-x-2 mb-1">
+                <span className="text-lg">{getChainInfo(chain).icon}</span>
+                <h3 className="text-lg font-semibold">{chain.toUpperCase()}</h3>
+              </div>
+              <p className="text-xs text-muted-foreground font-mono">{address.slice(0, 8)}...{address.slice(-6)}</p>
+            </div>
+            <div className="flex items-center space-x-1 text-muted-foreground">
+              <span className="text-sm">Waiting for data...</span>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <div className="text-2xl font-bold text-muted-foreground">
+                —
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div>
+                <p className="text-muted-foreground">24h Volume</p>
+                <p className="font-medium text-muted-foreground">—</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Liquidity</p>
+                <p className="font-medium text-muted-foreground">—</p>
+              </div>
+            </div>
+          </div>
+        </Card>
+      </motion.div>
+    )
+  }
 
   const chainInfo = getChainInfo(pair.data.chain)
   const change24h = pair.data.priceChange24h

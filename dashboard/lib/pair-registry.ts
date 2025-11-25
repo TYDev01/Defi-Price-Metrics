@@ -8,15 +8,33 @@ export interface ManagedPair {
   label?: string
 }
 
-const basePairs: ManagedPair[] = (process.env.NEXT_PUBLIC_PAIR_KEYS || '')
-  .split(',')
-  .map((key) => key.trim())
-  .filter(Boolean)
-  .map((entry) => {
-    const [chain, address] = entry.split(':')
-    return { chain: chain?.toLowerCase() || '', address: address?.toLowerCase() || '' }
-  })
-  .filter((pair) => pair.chain && pair.address)
+const parseEnvPairs = (): ManagedPair[] => {
+  const envPairs =
+    process.env.NEXT_PUBLIC_PAIR_KEYS ||
+    process.env.NEXT_PUBLIC_PAIRS ||
+    ''
+
+  if (!envPairs) {
+    return []
+  }
+
+  return envPairs
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      // Support either "chain:address" or "chain:address:symbol" formats
+      const [chain, address] = entry.split(':')
+      return {
+        chain: (chain || '').toLowerCase(),
+        address: (address || '').toLowerCase(),
+      }
+    })
+    .filter((pair) => pair.chain && pair.address)
+}
+
+// Base pairs come from env so the dashboard always has something to poll
+const basePairs: ManagedPair[] = parseEnvPairs()
 
 const dedupePairs = (pairs: ManagedPair[]): ManagedPair[] => {
   const seen = new Set<string>()
@@ -80,13 +98,18 @@ export const usePairRegistry = create<PairRegistryState>((set, get) => ({
       const adminPairs = Array.isArray(data.pairs) ? (data.pairs as ManagedPair[]) : []
       set({
         adminPairs,
-        combinedPairs: dedupePairs([...get().basePairs, ...adminPairs]),
+        combinedPairs: dedupePairs([...basePairs, ...adminPairs]),
         isLoading: false,
         error: null,
       })
     } catch (error) {
       console.warn('Failed to load admin pairs', error)
-      set({ isLoading: false, error: (error as Error).message })
+      // Even if Firebase fails, keep base pairs so the dashboard can read Somnia
+      set({
+        isLoading: false,
+        error: (error as Error).message,
+        combinedPairs: dedupePairs(basePairs),
+      })
     }
   },
 
@@ -102,10 +125,9 @@ export const usePairRegistry = create<PairRegistryState>((set, get) => ({
     }
 
     const key = pairKey(normalized)
-    const existsInBase = basePairs.some((base) => pairKey(base) === key)
     const existsInAdmin = get().adminPairs.some((existing) => pairKey(existing) === key)
 
-    if (existsInBase || existsInAdmin) {
+    if (existsInAdmin) {
       throw new Error('Pair already exists')
     }
 
@@ -123,7 +145,7 @@ export const usePairRegistry = create<PairRegistryState>((set, get) => ({
     const updated = [...get().adminPairs, normalized]
     set({
       adminPairs: updated,
-      combinedPairs: dedupePairs([...get().basePairs, ...updated]),
+      combinedPairs: dedupePairs([...basePairs, ...updated]),
     })
   },
 
@@ -146,7 +168,7 @@ export const usePairRegistry = create<PairRegistryState>((set, get) => ({
     const filtered = get().adminPairs.filter((pair) => pairKey(pair) !== key.toLowerCase())
     set({
       adminPairs: filtered,
-      combinedPairs: dedupePairs([...get().basePairs, ...filtered]),
+      combinedPairs: dedupePairs([...basePairs, ...filtered]),
     })
   },
 }))
