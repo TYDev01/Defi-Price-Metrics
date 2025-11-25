@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { usePriceStore } from '@/lib/store'
@@ -11,6 +11,7 @@ import { TrendingUp, TrendingDown } from 'lucide-react'
 import { usePairRegistry, pairKey as buildPairKey } from '@/lib/pair-registry'
 
 export function PairList() {
+  const [hydrated, setHydrated] = useState(false)
   const combinedPairs = usePairRegistry((state) => state.combinedPairs)
   const pairKeys = useMemo(() => combinedPairs.map((pair) => buildPairKey(pair)), [combinedPairs])
 
@@ -24,6 +25,10 @@ export function PairList() {
     pairsFromStore.forEach(pair => map.set(pair.key, pair))
     return map
   }, [pairsFromStore])
+
+  useEffect(() => {
+    setHydrated(true)
+  }, [])
 
   // Merge configured pairs with data from store
   const allPairs = useMemo(() => {
@@ -47,6 +52,15 @@ export function PairList() {
       return 0
     })
   }, [allPairs])
+
+  // Avoid hydration mismatches by waiting for client hydration
+  if (!hydrated) {
+    return (
+      <div className="rounded-xl border border-dashed border-muted-foreground/30 p-10 text-center">
+        <p className="text-lg font-medium">Loading pairs...</p>
+      </div>
+    )
+  }
 
   if (allPairs.length === 0) {
     return (

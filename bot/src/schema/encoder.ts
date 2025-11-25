@@ -1,5 +1,5 @@
 import { SchemaEncoder } from '@somnia-chain/streams';
-import { computeStreamId } from '../../../shared/streamId';
+import { computeStreamId } from '../utils/computeStreamId';
 
 /**
  * Schema definition for price data

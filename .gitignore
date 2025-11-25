@@ -71,3 +71,4 @@ firebase-service-account.json
 shared/.env.local
 shared/.env.development.local
 bot/test-streamid.js
+bot/test-dashboard-pairs.js
