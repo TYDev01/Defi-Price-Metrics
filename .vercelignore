@@ -1,0 +1,10 @@
+node_modules
+dashboard/node_modules
+bot/node_modules
+.git
+.next
+dashboard/.next
+bot/.next
+.env
+firebase-service-account.json
+*.log

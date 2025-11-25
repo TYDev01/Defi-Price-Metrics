@@ -10,9 +10,7 @@ export interface ManagedPair {
 
 const parseEnvPairs = (): ManagedPair[] => {
   const envPairs =
-    process.env.NEXT_PUBLIC_PAIR_KEYS ||
-    process.env.NEXT_PUBLIC_PAIRS ||
-    ''
+    (process.env.NEXT_PUBLIC_PAIR_KEYS || process.env.NEXT_PUBLIC_PAIRS || '').trim()
 
   if (!envPairs) {
     return []
