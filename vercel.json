@@ -5,7 +5,17 @@
   "installCommand": "cd dashboard && npm install",
   "framework": "nextjs",
   "outputDirectory": "dashboard/.next",
-  "regions": ["iad1"]
+  "regions": ["iad1"],
+  "github": {
+    "enabled": true,
+    "autoAlias": true
+  },
+  "git": {
+    "deploymentEnabled": {
+      "main": true,
+      "ui_polling": true
+    }
+  }
 }
 
 
