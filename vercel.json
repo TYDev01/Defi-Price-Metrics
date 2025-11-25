@@ -1,10 +1,9 @@
 {
   "version": 2,
-  "buildCommand": "cd dashboard && npm run build",
-  "devCommand": "cd dashboard && npm run dev",
-  "installCommand": "cd dashboard && npm install",
   "framework": "nextjs",
-  "outputDirectory": "dashboard/.next",
+  "installCommand": "npm install",
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
   "regions": ["iad1"],
   "github": {
     "enabled": true,

@@ -2,9 +2,9 @@ import { SDK, SchemaEncoder } from '@somnia-chain/streams'
 import { createPublicClient, http, Hex, defineChain } from 'viem'
 import { computeStreamId } from './streamId'
 
-const SOMNIA_RPC_URL = process.env.NEXT_PUBLIC_SOMNIA_RPC_URL || 'https://dream-rpc.somnia.network'
-const SCHEMA_ID = process.env.NEXT_PUBLIC_SCHEMA_ID as `0x${string}`
-const PUBLISHER_ADDRESS = process.env.NEXT_PUBLIC_PUBLISHER_ADDRESS as `0x${string}`
+const SOMNIA_RPC_URL = (process.env.NEXT_PUBLIC_SOMNIA_RPC_URL || 'https://dream-rpc.somnia.network').trim()
+const SCHEMA_ID = (process.env.NEXT_PUBLIC_SCHEMA_ID || '').trim() as `0x${string}`
+const PUBLISHER_ADDRESS = (process.env.NEXT_PUBLIC_PUBLISHER_ADDRESS || '').trim() as `0x${string}`
 
 // Schema definition - must match bot/src/schema/encoder.ts
 const PRICE_SCHEMA = 'uint64 timestamp, string pair, string chain, uint256 priceUsd, uint256 liquidity, uint256 volume24h, int32 priceChange1h, int32 priceChange24h'

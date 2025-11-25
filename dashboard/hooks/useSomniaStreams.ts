@@ -6,9 +6,9 @@ import { SchemaEncoder, SDK } from '@somnia-chain/streams'
 import { createPublicClient, http, defineChain } from 'viem'
 import { computeStreamId } from '../lib/streamId'
 
-const SOMNIA_RPC_URL = process.env.NEXT_PUBLIC_SOMNIA_RPC_URL || ''
-const SCHEMA_ID = process.env.NEXT_PUBLIC_SCHEMA_ID || ''
-const PUBLISHER_ADDRESS = process.env.NEXT_PUBLIC_PUBLISHER_ADDRESS || ''
+const SOMNIA_RPC_URL = (process.env.NEXT_PUBLIC_SOMNIA_RPC_URL || '').trim()
+const SCHEMA_ID = (process.env.NEXT_PUBLIC_SCHEMA_ID || '').trim()
+const PUBLISHER_ADDRESS = (process.env.NEXT_PUBLIC_PUBLISHER_ADDRESS || '').trim()
 const NORMALIZED_SCHEMA_ID = normalizeSchemaId(SCHEMA_ID)
 
 const somniaChain = defineChain({
