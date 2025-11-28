@@ -53,8 +53,8 @@ export function PairStats({ pairKey }: PairStatsProps) {
 
   return (
     <div className="space-y-4">
-      <Card className="p-6">
-        <h2 className="text-lg font-semibold mb-4">Market Stats</h2>
+      <Card className="p-4 md:p-6">
+        <h2 className="text-base md:text-lg font-semibold mb-3 md:mb-4">Market Stats</h2>
         <div className="space-y-4">
           {stats.map((stat) => (
             <div key={stat.label} className="flex items-center justify-between">
@@ -70,8 +70,8 @@ export function PairStats({ pairKey }: PairStatsProps) {
         </div>
       </Card>
 
-      <Card className="p-6">
-        <h2 className="text-lg font-semibold mb-4">Pair Information</h2>
+      <Card className="p-4 md:p-6">
+        <h2 className="text-base md:text-lg font-semibold mb-3 md:mb-4">Pair Information</h2>
         <div className="space-y-3 text-sm">
           <div className="flex justify-between">
             <span className="text-muted-foreground">Pair</span>

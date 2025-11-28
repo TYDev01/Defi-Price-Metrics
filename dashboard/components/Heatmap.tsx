@@ -37,9 +37,9 @@ export function Heatmap() {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <Card className="p-6">
-        <h2 className="text-2xl font-bold mb-4 text-up">Top Gainers (24h)</h2>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+      <Card className="p-4 md:p-6">
+        <h2 className="text-xl md:text-2xl font-bold mb-4 text-up">Top Gainers (24h)</h2>
         <div className="space-y-3">
           {gainers.map((pair, index) => (
             <HeatmapItem key={pair.key} pair={pair} index={index} type="gainer" />
@@ -47,8 +47,8 @@ export function Heatmap() {
         </div>
       </Card>
 
-      <Card className="p-6">
-        <h2 className="text-2xl font-bold mb-4 text-down">Top Losers (24h)</h2>
+      <Card className="p-4 md:p-6">
+        <h2 className="text-xl md:text-2xl font-bold mb-4 text-down">Top Losers (24h)</h2>
         <div className="space-y-3">
           {losers.map((pair, index) => (
             <HeatmapItem key={pair.key} pair={pair} index={index} type="loser" />
@@ -56,9 +56,9 @@ export function Heatmap() {
         </div>
       </Card>
 
-      <Card className="p-6 lg:col-span-2">
-        <h2 className="text-2xl font-bold mb-4">Market Overview</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <Card className="p-4 md:p-6 lg:col-span-2">
+        <h2 className="text-xl md:text-2xl font-bold mb-4">Market Overview</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
           {pairs.map((pair, index) => {
             if (!pair.data) return null
             const change = pair.data.priceChange24h

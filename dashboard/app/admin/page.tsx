@@ -110,16 +110,16 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8 space-y-10">
+      <div className="container mx-auto px-4 py-6 md:py-8 space-y-6 md:space-y-10">
         <div>
-          <h1 className="text-4xl font-bold mb-2">Admin – Global Pairs</h1>
+          <h1 className="text-3xl md:text-4xl font-bold mb-2">Admin – Global Pairs</h1>
           <p className="text-muted-foreground max-w-2xl">
             Add or remove trading pairs that should appear on the public dashboard. Remember to keep the bot configuration in sync so the new pairs receive Somnia updates.
           </p>
         </div>
 
-        <Card className="p-6 space-y-6">
-          <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-3">
+        <Card className="p-4 md:p-6 space-y-4 md:space-y-6">
+          <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
             <div>
               <label className="text-xs uppercase tracking-wide text-muted-foreground">Chain</label>
               <select
@@ -166,11 +166,11 @@ export default function AdminPage() {
         </Card>
 
         <section>
-          <h2 className="text-2xl font-semibold mb-4">Custom Pairs</h2>
+          <h2 className="text-xl md:text-2xl font-semibold mb-4">Custom Pairs</h2>
           {adminPairs.length === 0 ? (
             <p className="text-muted-foreground text-sm">No custom pairs added yet.</p>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {adminPairs.map((pair) => {
                 const info = getChainInfo(pair.chain)
                 const key = pairKey(pair)

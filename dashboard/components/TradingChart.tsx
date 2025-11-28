@@ -38,7 +38,7 @@ export function TradingChart({ pairKey }: TradingChartProps) {
         horzLines: { color: '#1F2937' },
       },
       width: chartContainerRef.current.clientWidth,
-      height: 400,
+      height: window.innerWidth < 768 ? 300 : 400,
       timeScale: {
         timeVisible: true,
         secondsVisible: false,
@@ -92,11 +92,11 @@ export function TradingChart({ pairKey }: TradingChartProps) {
   }, [chartHistory])
 
   return (
-    <Card className="p-6">
-      <div className="mb-4 flex items-center justify-between">
+    <Card className="p-4 md:p-6">
+      <div className="mb-3 md:mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
-          <h2 className="text-lg font-semibold">Price Chart</h2>
-          <p className="text-sm text-muted-foreground">
+          <h2 className="text-base md:text-lg font-semibold">Price Chart</h2>
+          <p className="text-xs md:text-sm text-muted-foreground">
             {isLoading ? 'Loading historical data from Somnia...' : 
              error ? `Error: ${error}` :
              `${history.length} data points from Somnia Data Streams`}

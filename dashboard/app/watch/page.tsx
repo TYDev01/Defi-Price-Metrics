@@ -181,16 +181,16 @@ export default function WatchPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8 space-y-10">
+      <div className="container mx-auto px-4 py-6 md:py-8 space-y-6 md:space-y-10">
         <div>
-          <h1 className="text-4xl font-bold mb-2">My Watch</h1>
+          <h1 className="text-3xl md:text-4xl font-bold mb-2">My Watch</h1>
           <p className="text-muted-foreground max-w-2xl">
             Track personal pairs with real-time DexScreener data. Everything stays local to your wallet/browser.
           </p>
         </div>
 
-        <Card className="p-6">
-          <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-4">
+        <Card className="p-4 md:p-6">
+          <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
             <div>
               <label className="text-xs uppercase tracking-wide text-muted-foreground">Chain</label>
               <select
@@ -236,11 +236,11 @@ export default function WatchPage() {
         </Card>
 
         <section>
-          <h2 className="text-2xl font-semibold mb-4">Tracked Pairs</h2>
+          <h2 className="text-xl md:text-2xl font-semibold mb-4">Tracked Pairs</h2>
           {watchlist.length === 0 ? (
             <p className="text-muted-foreground text-sm">No pairs yet. Add one above to get started.</p>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
               {watchlist.map((pair) => {
                 const key = pairKey(pair)
                 const snapshot = prices[key]

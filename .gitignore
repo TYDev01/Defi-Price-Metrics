@@ -75,3 +75,5 @@ bot/test-dashboard-pairs.js
 ONCHAIN_CHARTING_IMPLEMENTATION.md
 .env.vercel
 .env.vercel.production
+dashboard/.env.vercel.check
+mdjs.md

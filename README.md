@@ -29,7 +29,7 @@ This creates a fully decentralized, verifiable, and reactive system where users 
 ## 🏗️ Architecture
 
 ```
-DexScreener REST/SSE → Price Bot → Somnia Streams (on-chain) → Next.js Dashboard
+DexScreener REST/SSE → Price Bot → Somnia Streams (on-chain) →  Dashboard
 ```
 
 - **Price Bot**: Node.js/TypeScript backend that polls DexScreener, deduplicates updates, and batches Somnia writes
@@ -47,7 +47,6 @@ This project is **fully integrated with Somnia Data Streams SDK** (`@somnia-chai
 - ✅ Reads data from Somnia using `getByKey()` with schema decoding
 - ✅ Computes schema IDs / hashes for each `chain:address` pair
 
-**The bot writes to Somnia Data Streams whenever DexScreener produces a new value.** The dashboard polls Somnia every 3 seconds and, until the first on-chain update arrives for a pair, seeds the card with a real-time DexScreener snapshot so the UI never shows stale placeholders.
 
 ## 🚀 Quick Start
 

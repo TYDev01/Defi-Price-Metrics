@@ -33,38 +33,38 @@ export function PriceHeader({ pairKey }: PriceHeaderProps) {
   const change1h = pair.data.priceChange1h
 
   return (
-    <div className="mb-6">
+    <div className="mb-4 md:mb-6">
       <Link
         href="/"
-        className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4"
+        className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-3 md:mb-4"
       >
         <ArrowLeft className="h-4 w-4 mr-2" />
         Back to Markets
       </Link>
 
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
         <div>
-          <div className="flex items-center space-x-3 mb-2">
-            <span className="text-3xl">{chainInfo.icon}</span>
+          <div className="flex items-center space-x-2 md:space-x-3 mb-2">
+            <span className="text-2xl md:text-3xl">{chainInfo.icon}</span>
             <div>
-              <h1 className="text-4xl font-bold">{pair.data.pair}</h1>
-              <p className="text-muted-foreground">{chainInfo.name}</p>
+              <h1 className="text-2xl md:text-4xl font-bold">{pair.data.pair}</h1>
+              <p className="text-sm md:text-base text-muted-foreground">{chainInfo.name}</p>
             </div>
           </div>
         </div>
 
-        <div className="text-right">
+        <div className="md:text-right">
           <motion.div
             key={pair.data.priceUsd.toString()}
             initial={{ scale: 1 }}
             animate={{ scale: [1, 1.1, 1] }}
             transition={{ duration: 0.5 }}
-            className="text-4xl font-bold mb-2"
+            className="text-3xl md:text-4xl font-bold mb-2"
           >
             {formatPrice(pair.data.priceUsd)}
           </motion.div>
           
-          <div className="flex items-center space-x-4 justify-end">
+          <div className="flex items-center space-x-3 md:space-x-4 md:justify-end">
             <div className={`text-sm ${getChangeColor(change1h)}`}>
               1h: {formatPercentage(change1h)}
             </div>
